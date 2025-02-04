@@ -67,10 +67,6 @@ void PrintPC(char *szFormat, ...);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define LED_Pin GPIO_PIN_0
-#define LED_GPIO_Port GPIOA
-#define GIMON_Pin GPIO_PIN_3
-#define GIMON_GPIO_Port GPIOA
 #define CE5V_Pin GPIO_PIN_4
 #define CE5V_GPIO_Port GPIOA
 #define ENUVLO_Pin GPIO_PIN_1

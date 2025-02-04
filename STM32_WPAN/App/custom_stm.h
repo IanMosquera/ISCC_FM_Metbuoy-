@@ -36,17 +36,13 @@ typedef enum
 {
   /* SPP */
   CUSTOM_STM_TX,
-  CUSTOM_STM_RX,
 } Custom_STM_Char_Opcode_t;
 
 typedef enum
 {
   /* Transmit */
   CUSTOM_STM_TX_WRITE_NO_RESP_EVT,
-  /* Receive */
-  CUSTOM_STM_RX_READ_EVT,
-  CUSTOM_STM_RX_NOTIFY_ENABLED_EVT,
-  CUSTOM_STM_RX_NOTIFY_DISABLED_EVT,
+  CUSTOM_STM_TX_WRITE_EVT,
   CUSTOM_STM_NOTIFICATION_COMPLETE_EVT,
 
   CUSTOM_STM_BOOT_REQUEST_EVT
@@ -73,7 +69,6 @@ typedef struct
 
 /* Exported constants --------------------------------------------------------*/
 extern uint16_t SizeTx;
-extern uint16_t SizeRx;
 
 /* USER CODE BEGIN EC */
 

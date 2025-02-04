@@ -56,16 +56,12 @@ typedef enum{
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-ADC_HandleTypeDef hadc1;
-DMA_HandleTypeDef hdma_adc1;
-
 I2C_HandleTypeDef hi2c1;
 
 IPCC_HandleTypeDef hipcc;
 
 RTC_HandleTypeDef hrtc;
 
-TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim16;
 
 /* USER CODE BEGIN PV */
@@ -130,13 +126,10 @@ void SystemClock_Config(void);
 void PeriphCommonClock_Config(void);
 static void MX_RF_Init(void);
 static void MX_GPIO_Init(void);
-static void MX_DMA_Init(void);
-static void MX_ADC1_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_RTC_Init(void);
 static void MX_TIM16_Init(void);
 static void MX_IPCC_Init(void);
-static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 static void ISCC_GPIO_Init(void);
 //static void ADC_Init(void);
@@ -190,13 +183,10 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_RF_Init();
   MX_GPIO_Init();
-  MX_DMA_Init();
-  MX_ADC1_Init();
   MX_I2C1_Init();
   MX_RTC_Init();
   MX_TIM16_Init();
   MX_USB_Device_Init();
-  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   sts40_TXCODE =  0xFD;
   HAL_Delay(3000);
@@ -210,7 +200,7 @@ int main(void)
   LTC_Init();
 
 //  ADC_Init();
-  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buff, 32);
+//  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buff, 32);
 
 
   ISCC_GPIO_Init();
@@ -246,6 +236,11 @@ void SystemClock_Config(void)
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
+  /** Configure LSE Drive Capability
+  */
+  HAL_PWR_EnableBkUpAccess();
+  __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_MEDIUMHIGH);
+
   /** Configure the main internal regulator output voltage
   */
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
@@ -254,12 +249,12 @@ void SystemClock_Config(void)
   * in the RCC_OscInitTypeDef structure.
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI48|RCC_OSCILLATORTYPE_HSI
-                              |RCC_OSCILLATORTYPE_LSI2|RCC_OSCILLATORTYPE_HSE;
+                              |RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = RCC_PLLM_DIV2;
@@ -312,64 +307,6 @@ void PeriphCommonClock_Config(void)
   /* USER CODE BEGIN Smps */
   LL_HSEM_1StepLock( HSEM, 5);
   /* USER CODE END Smps */
-}
-
-/**
-  * @brief ADC1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_ADC1_Init(void)
-{
-
-  /* USER CODE BEGIN ADC1_Init 0 */
-
-  /* USER CODE END ADC1_Init 0 */
-
-  ADC_ChannelConfTypeDef sConfig = {0};
-
-  /* USER CODE BEGIN ADC1_Init 1 */
-
-  /* USER CODE END ADC1_Init 1 */
-
-  /** Common config
-  */
-  hadc1.Instance = ADC1;
-  hadc1.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
-  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
-  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
-  hadc1.Init.LowPowerAutoWait = DISABLE;
-  hadc1.Init.ContinuousConvMode = ENABLE;
-  hadc1.Init.NbrOfConversion = 1;
-  hadc1.Init.DiscontinuousConvMode = DISABLE;
-  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
-  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-  hadc1.Init.DMAContinuousRequests = ENABLE;
-  hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
-  hadc1.Init.OversamplingMode = DISABLE;
-  if (HAL_ADC_Init(&hadc1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure Regular Channel
-  */
-  sConfig.Channel = ADC_CHANNEL_8;
-  sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_2CYCLES_5;
-  sConfig.SingleDiff = ADC_SINGLE_ENDED;
-  sConfig.OffsetNumber = ADC_OFFSET_NONE;
-  sConfig.Offset = 0;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN ADC1_Init 2 */
-
-  /* USER CODE END ADC1_Init 2 */
-
 }
 
 /**
@@ -540,51 +477,6 @@ static void MX_RTC_Init(void)
 }
 
 /**
-  * @brief TIM2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM2_Init(void)
-{
-
-  /* USER CODE BEGIN TIM2_Init 0 */
-
-  /* USER CODE END TIM2_Init 0 */
-
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-  /* USER CODE BEGIN TIM2_Init 1 */
-
-  /* USER CODE END TIM2_Init 1 */
-  htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 32000-1;
-  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 5000-1;
-  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM2_Init 2 */
-
-  /* USER CODE END TIM2_Init 2 */
-
-}
-
-/**
   * @brief TIM16 Initialization Function
   * @param None
   * @retval None
@@ -617,23 +509,6 @@ static void MX_TIM16_Init(void)
 }
 
 /**
-  * Enable DMA controller clock
-  */
-static void MX_DMA_Init(void)
-{
-
-  /* DMA controller clock enable */
-  __HAL_RCC_DMAMUX1_CLK_ENABLE();
-  __HAL_RCC_DMA1_CLK_ENABLE();
-
-  /* DMA interrupt init */
-  /* DMA1_Channel1_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
-
-}
-
-/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -651,17 +526,17 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOE_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LED_Pin|CE5V_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(CE5V_GPIO_Port, CE5V_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(ENUVLO_GPIO_Port, ENUVLO_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : LED_Pin CE5V_Pin */
-  GPIO_InitStruct.Pin = LED_Pin|CE5V_Pin;
+  /*Configure GPIO pin : CE5V_Pin */
+  GPIO_InitStruct.Pin = CE5V_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(CE5V_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : ENUVLO_Pin */
   GPIO_InitStruct.Pin = ENUVLO_Pin;
@@ -675,14 +550,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(SW1_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : PB6 PB7 */
-  GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_7;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  GPIO_InitStruct.Alternate = GPIO_AF7_USART1;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI4_IRQn, 2, 0);
@@ -728,7 +595,7 @@ static void ISCC_GPIO_Init(void)
 	HAL_GPIO_WritePin(CE5V_GPIO_Port, CE5V_Pin, GPIO_PIN_SET);				/**< Enable 5V output of TS300 5V Converter */
 	HAL_GPIO_WritePin(ENUVLO_GPIO_Port, ENUVLO_Pin, GPIO_PIN_RESET);	/**< Enable E-FUSE ENUVLO pin*/
 //	HAL_GPIO_WritePin(SW1_GPIO_Port, SW1_Pin, GPIO_PIN_RESET); 				/**< TurnOff Load by default*/
-	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+//	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
 	switch_Mode					= 0;
 	switch_Counter 			= 0;
@@ -775,7 +642,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 //  my_uart_buffer_index = 0;
 //}
 
-void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc){
+//void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc){
 //	uint16_t i;
 //
 //	adc_buff_average[0] = 0;
@@ -783,17 +650,17 @@ void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc){
 //	for(i = 0; i < 32; i++){
 //		adc_buff_average[0] = adc_buff_average[0] + (adc_buff[i] / 32);
 //	}
-}
+//}
 
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc){
-	uint16_t i;
-
-	adc_buff_average[1] = 0;
-
-	for(i = 0; i < 32; i++){
-		adc_buff_average[1] = adc_buff_average[1] + (adc_buff[i] / 32);
-	}
-}
+//void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc){
+//	uint16_t i;
+//
+//	adc_buff_average[1] = 0;
+//
+//	for(i = 0; i < 32; i++){
+//		adc_buff_average[1] = adc_buff_average[1] + (adc_buff[i] / 32);
+//	}
+//}
 
 
 
