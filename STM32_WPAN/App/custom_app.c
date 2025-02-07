@@ -76,6 +76,8 @@ uint16_t Connection_Handle;
 extern TIM_HandleTypeDef htim2;
 
 static char	a_SzString[70];		/*buffer for everything else*/
+uint8_t txbuff[70];
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -184,7 +186,7 @@ void Custom_APP_Init(void)
   /* USER CODE BEGIN CUSTOM_APP_Init */
 	UTIL_SEQ_RegTask(1 << CFG_TASK_DUMMY, UTIL_SEQ_RFU, SPP_Transmit);
 
-	sprintf(a_SzString, "BLE Manual Transmit\r\n");
+	sprintf(a_SzString, "BLE Transmit Test\r\n");
 
 	HAL_TIM_Base_Start_IT(&htim2);
 
@@ -244,11 +246,15 @@ void Custom_Rx_Send_Notification(void) /* Property Notification */
 
 /* USER CODE BEGIN FD_LOCAL_FUNCTIONS*/
 void SPP_Transmit(void){
+
 	SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&a_SzString[0]);
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if (htim == &htim2){
+
+		sprintf((char *)txbuff,"USB Transmit Test\r\n");
+		CDC_Transmit_FS(txbuff, strlen((char *)txbuff));
 
 		UTIL_SEQ_SetTask(1 << CFG_TASK_DUMMY, CFG_SCH_PRIO_0);
 		HAL_GPIO_TogglePin(STAT_GPIO_Port, STAT_Pin);
