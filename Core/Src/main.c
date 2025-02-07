@@ -15,10 +15,15 @@
   *
   ******************************************************************************
   */
+
+
+// Author: 	Ian C Mosquera
+// Date: 		06 Feb, 2025
+// Company: DOST-ASTI
+
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -31,7 +36,7 @@
 #include "stm_queue.h"
 #include "stdint.h"
 #include "stdbool.h"
-#include "usbd_cdc_if.h"
+//#include "usbd_cdc_if.h"
 #include "LTC4162.h"
 #include "ASTI_RTC.h"
 
@@ -39,7 +44,8 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-typedef enum{
+typedef enum
+{
 	Initialize 		= 0,
 	Main_Program	= 1
 }Boot_State;
@@ -62,7 +68,7 @@ IPCC_HandleTypeDef hipcc;
 
 RTC_HandleTypeDef hrtc;
 
-TIM_HandleTypeDef htim16;
+TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
 // LTC4162 Variables
@@ -128,8 +134,8 @@ static void MX_RF_Init(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_RTC_Init(void);
-static void MX_TIM16_Init(void);
 static void MX_IPCC_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 static void ISCC_GPIO_Init(void);
 //static void ADC_Init(void);
@@ -185,18 +191,17 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C1_Init();
   MX_RTC_Init();
-  MX_TIM16_Init();
-  MX_USB_Device_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   sts40_TXCODE =  0xFD;
   HAL_Delay(3000);
 
   PrintPC("\r\n\r\nInitiate RTC");
-  RTC_Init();
+//  RTC_Init();
 
   PrintPC("\r\n\r\nASTI iSCC FW: 1.0.1");
 
-  PrintPC("\r\n\r\nInitiate LTC Device");
+//  PrintPC("\r\n\r\nInitiate LTC Device");
   LTC_Init();
 
 //  ADC_Init();
@@ -204,6 +209,7 @@ int main(void)
 
 
   ISCC_GPIO_Init();
+
 
   /* USER CODE END 2 */
 
@@ -214,7 +220,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
 
 
-	HAL_TIM_Base_Start_IT(&htim16); /* Start ADC Timer */
+	HAL_TIM_Base_Start_IT(&htim2);
 
   while (1)
   {
@@ -248,20 +254,13 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI48|RCC_OSCILLATORTYPE_HSI
-                              |RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_HSE
+                              |RCC_OSCILLATORTYPE_LSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = RCC_PLLM_DIV2;
-  RCC_OscInitStruct.PLL.PLLN = 8;
-  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-  RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
-  RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -272,14 +271,14 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK4|RCC_CLOCKTYPE_HCLK2
                               |RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSE;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.AHBCLK2Divider = RCC_SYSCLK_DIV2;
+  RCC_ClkInitStruct.AHBCLK2Divider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.AHBCLK4Divider = RCC_SYSCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_3) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
   {
     Error_Handler();
   }
@@ -296,7 +295,7 @@ void PeriphCommonClock_Config(void)
   /** Initializes the peripherals clock
   */
   PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SMPS|RCC_PERIPHCLK_RFWAKEUP;
-  PeriphClkInitStruct.RFWakeUpClockSelection = RCC_RFWKPCLKSOURCE_HSE_DIV1024;
+  PeriphClkInitStruct.RFWakeUpClockSelection = RCC_RFWKPCLKSOURCE_LSE;
   PeriphClkInitStruct.SmpsClockSelection = RCC_SMPSCLKSOURCE_HSE;
   PeriphClkInitStruct.SmpsDivSelection = RCC_SMPSCLKDIV_RANGE0;
 
@@ -305,7 +304,7 @@ void PeriphCommonClock_Config(void)
     Error_Handler();
   }
   /* USER CODE BEGIN Smps */
-  LL_HSEM_1StepLock( HSEM, 5);
+//  LL_HSEM_1StepLock( HSEM, 5);
   /* USER CODE END Smps */
 }
 
@@ -325,7 +324,7 @@ static void MX_I2C1_Init(void)
 
   /* USER CODE END I2C1_Init 1 */
   hi2c1.Instance = I2C1;
-  hi2c1.Init.Timing = 0x10B17DB5;
+  hi2c1.Init.Timing = 0x00B07CB4;
   hi2c1.Init.OwnAddress1 = 0;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
@@ -477,34 +476,47 @@ static void MX_RTC_Init(void)
 }
 
 /**
-  * @brief TIM16 Initialization Function
+  * @brief TIM2 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_TIM16_Init(void)
+static void MX_TIM2_Init(void)
 {
 
-  /* USER CODE BEGIN TIM16_Init 0 */
+  /* USER CODE BEGIN TIM2_Init 0 */
 
-  /* USER CODE END TIM16_Init 0 */
+  /* USER CODE END TIM2_Init 0 */
 
-  /* USER CODE BEGIN TIM16_Init 1 */
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
 
-  /* USER CODE END TIM16_Init 1 */
-  htim16.Instance = TIM16;
-  htim16.Init.Prescaler = 32000 - 1;
-  htim16.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim16.Init.Period = 5000 - 1;
-  htim16.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim16.Init.RepetitionCounter = 0;
-  htim16.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim16) != HAL_OK)
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 32000-1;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 5000-1;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN TIM16_Init 2 */
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
 
-  /* USER CODE END TIM16_Init 2 */
+  /* USER CODE END TIM2_Init 2 */
 
 }
 
@@ -552,7 +564,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(SW1_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI4_IRQn, 2, 0);
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
@@ -597,18 +609,9 @@ static void ISCC_GPIO_Init(void)
 //	HAL_GPIO_WritePin(SW1_GPIO_Port, SW1_Pin, GPIO_PIN_RESET); 				/**< TurnOff Load by default*/
 //	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
-	switch_Mode					= 0;
-	switch_Counter 			= 0;
-	longpress_duration 	= 6;
 }
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
-	if (GPIO_Pin == SW1_Pin)
-	{
-		switch_Mode = 1;
-	}
-}
+
 
 //void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 //{
@@ -728,7 +731,7 @@ void PrintPC(char *szFormat, ...){
 						uintval = va_arg(ptArg, uint8_t *);
 						sprintf((char *) strDisplay, (char *) str, uintval);
 						i = 0;
-						CDC_Transmit_FS((uint8_t *)strDisplay, strlen((char *)strDisplay));
+//						CDC_Transmit_FS((uint8_t *)strDisplay, strlen((char *)strDisplay));
 						break;
 
 					case 'f':
@@ -737,7 +740,7 @@ void PrintPC(char *szFormat, ...){
 						fval = va_arg(ptArg, float *);
 						sprintf((char *) strDisplay, (char *) str, fval);
 						i = 0;
-						CDC_Transmit_FS((uint8_t *)strDisplay, strlen((char *)strDisplay));
+//						CDC_Transmit_FS((uint8_t *)strDisplay, strlen((char *)strDisplay));
 						break;
 
 					case 's':
@@ -746,7 +749,7 @@ void PrintPC(char *szFormat, ...){
 						sval = va_arg(ptArg, int8_t *);
 						sprintf((char *) strDisplay, (char *) str, sval);
 						i = 0;
-						CDC_Transmit_FS((uint8_t *)strDisplay, strlen(strDisplay));
+//						CDC_Transmit_FS((uint8_t *)strDisplay, strlen(strDisplay));
 						break;
 
 					default:
@@ -755,7 +758,7 @@ void PrintPC(char *szFormat, ...){
 			}
 		}
 		str[i++] = 0;
-		CDC_Transmit_FS((uint8_t *)str, strlen(str));
+//		CDC_Transmit_FS((uint8_t *)str, strlen(str));
 		va_end(ptArg);
 		BusyFlag = FREE_FLAG;
   }

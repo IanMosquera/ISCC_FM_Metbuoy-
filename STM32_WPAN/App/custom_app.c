@@ -29,7 +29,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "usbd_cdc_if.h"
+//#include "usbd_cdc_if.h"
 #include "LTC4162.h"
 #include "ASTI_RTC.h"
 #include "math.h"
@@ -39,6 +39,7 @@
 typedef struct
 {
   /* SPP */
+  uint8_t               Rx_Notification_Status;
   /* USER CODE BEGIN CUSTOM_APP_Context_t */
 
   /* USER CODE END CUSTOM_APP_Context_t */
@@ -75,12 +76,13 @@ uint8_t UpdateCharData[512];
 uint8_t NotifyCharData[512];
 uint16_t Connection_Handle;
 /* USER CODE BEGIN PV */
-//extern ADC_HandleTypeDef hadc1;
+
+// extern ADC_HandleTypeDef hadc1;
 extern DMA_HandleTypeDef hdma_adc1;
 extern I2C_HandleTypeDef hi2c1;
 extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim16;
-//extern UART_HandleTypeDef huart1;
+// extern UART_HandleTypeDef huart1;
 
 extern LTC4162 ltc;
 
@@ -93,17 +95,20 @@ uint8_t rtcDate[14]	=	 "24-02-01";
 
 static char	a_SzString[70];		/*buffer for everything else*/
 
-//STS40 Variables
-extern uint8_t	STS40_RXBuffer[3];     // RX buffer for I2C
-extern uint8_t	sts40_TXCODE; 	// measure T with highest precision
+// STS40 Variables
+extern uint8_t	STS40_RXBuffer[3]; 	// RX buffer for I2C
+extern uint8_t	sts40_TXCODE; 			// measure T with highest precision
 extern volatile float Temp_C;
 
 extern uint16_t adc_buff_average[2];
 extern float gIMON;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 /* SPP */
+static void Custom_Rx_Update_Char(void);
+static void Custom_Rx_Send_Notification(void);
 
 /* USER CODE BEGIN PFP */
 void ReadChargingData(void);
@@ -125,16 +130,34 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
     /* USER CODE END CUSTOM_STM_App_Notification_Custom_Evt_Opcode */
 
     /* SPP */
+    case CUSTOM_STM_TX_READ_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_TX_READ_EVT */
+
+      /* USER CODE END CUSTOM_STM_TX_READ_EVT */
+      break;
+
     case CUSTOM_STM_TX_WRITE_NO_RESP_EVT:
       /* USER CODE BEGIN CUSTOM_STM_TX_WRITE_NO_RESP_EVT */
-
+    	pNotification->DataTransfered.pPayload[pNotification->DataTransfered.Length] = '\0';
       /* USER CODE END CUSTOM_STM_TX_WRITE_NO_RESP_EVT */
       break;
 
-    case CUSTOM_STM_TX_WRITE_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_TX_WRITE_EVT */
+    case CUSTOM_STM_RX_READ_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_RX_READ_EVT */
 
-      /* USER CODE END CUSTOM_STM_TX_WRITE_EVT */
+      /* USER CODE END CUSTOM_STM_RX_READ_EVT */
+      break;
+
+    case CUSTOM_STM_RX_NOTIFY_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_RX_NOTIFY_ENABLED_EVT */
+
+      /* USER CODE END CUSTOM_STM_RX_NOTIFY_ENABLED_EVT */
+      break;
+
+    case CUSTOM_STM_RX_NOTIFY_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_RX_NOTIFY_DISABLED_EVT */
+
+      /* USER CODE END CUSTOM_STM_RX_NOTIFY_DISABLED_EVT */
       break;
 
     case CUSTOM_STM_NOTIFICATION_COMPLETE_EVT:
@@ -196,9 +219,12 @@ void Custom_APP_Init(void)
 {
   /* USER CODE BEGIN CUSTOM_APP_Init */
 	UTIL_SEQ_RegTask(1 << CFG_TASK_READ_CHGDATA, UTIL_SEQ_RFU, ReadChargingData);
-//	UTIL_SEQ_RegTask(1 << CFG_TASK_USER_SW1_PRESSED, UTIL_SEQ_RFU, SPP_Transmit);
+	UTIL_SEQ_RegTask(1 << CFG_TASK_USER_SW1_PRESSED, UTIL_SEQ_RFU, SPP_Transmit);
 
-	HAL_TIM_Base_Start_IT(&htim16);
+
+	sprintf((char *)a_SzString,"TestMessage\r\n");
+	HAL_TIM_Base_Start_IT(&htim2);
+
   /* USER CODE END CUSTOM_APP_Init */
   return;
 }
@@ -246,9 +272,10 @@ void ReadChargingData(void){
 
 }
 
-//void SPP_Transmit(void){
-//	SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&a_SzString[0]);
-//}
+void SPP_Transmit(void){
+	sprintf((char *)a_SzString,"TestMessage\r\n");
+	SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&a_SzString[0]);
+}
 
 void ReadGIMON(void){
 	uint16_t temp;
@@ -258,17 +285,27 @@ void ReadGIMON(void){
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-	if (htim == &htim16){
-		ReadChargingData();
+	if (htim == &htim2)
+	{
+//		ReadChargingData();
 //		UTIL_SEQ_SetTask(1 << CFG_TASK_READ_CHGDATA, CFG_SCH_PRIO_0);
-//		SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
 //		PrintPC("\r\n%s", system_Message);
 
-//		sprintf(a_SzString, "SW1 Pressed\r\n");
+//		UTIL_SEQ_SetTask(1 << CFG_TASK_USER_SW1_PRESSED, CFG_SCH_PRIO_0);
 //		SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&a_SzString[0]);
 	}
 }
 
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if (GPIO_Pin == SW1_Pin)
+	{
+		sprintf(a_SzString, "SW1 Pressed\r\n");
+		PrintPC("%s", a_SzString);
+//		SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&a_SzString[0]);
+
+	}
+}
 /* USER CODE END FD */
 
 /*************************************************************
@@ -278,6 +315,44 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
  *************************************************************/
 
 /* SPP */
+__USED void Custom_Rx_Update_Char(void) /* Property Read */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Rx_UC_1*/
+
+  /* USER CODE END Rx_UC_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_RX, (uint8_t *)UpdateCharData);
+  }
+
+  /* USER CODE BEGIN Rx_UC_Last*/
+
+  /* USER CODE END Rx_UC_Last*/
+  return;
+}
+
+void Custom_Rx_Send_Notification(void) /* Property Notification */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Rx_NS_1*/
+
+  /* USER CODE END Rx_NS_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_RX, (uint8_t *)NotifyCharData);
+  }
+
+  /* USER CODE BEGIN Rx_NS_Last*/
+
+  /* USER CODE END Rx_NS_Last*/
+
+  return;
+}
 
 /* USER CODE BEGIN FD_LOCAL_FUNCTIONS*/
 
