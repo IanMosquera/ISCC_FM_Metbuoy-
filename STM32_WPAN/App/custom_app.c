@@ -29,13 +29,14 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "usbd_cdc_if.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 typedef struct
 {
   /* icmService */
+  uint8_t               Rx_Notification_Status;
   /* USER CODE BEGIN CUSTOM_APP_Context_t */
 
   /* USER CODE END CUSTOM_APP_Context_t */
@@ -72,11 +73,15 @@ uint8_t UpdateCharData[512];
 uint8_t NotifyCharData[512];
 uint16_t Connection_Handle;
 /* USER CODE BEGIN PV */
+extern TIM_HandleTypeDef htim2;
 
+static char	a_SzString[70];		/*buffer for everything else*/
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 /* icmService */
+static void Custom_Rx_Update_Char(void);
+static void Custom_Rx_Send_Notification(void);
 
 /* USER CODE BEGIN PFP */
 
@@ -99,6 +104,24 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
       /* USER CODE BEGIN CUSTOM_STM_TX_WRITE_NO_RESP_EVT */
 
       /* USER CODE END CUSTOM_STM_TX_WRITE_NO_RESP_EVT */
+      break;
+
+    case CUSTOM_STM_RX_READ_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_RX_READ_EVT */
+
+      /* USER CODE END CUSTOM_STM_RX_READ_EVT */
+      break;
+
+    case CUSTOM_STM_RX_NOTIFY_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_RX_NOTIFY_ENABLED_EVT */
+
+      /* USER CODE END CUSTOM_STM_RX_NOTIFY_ENABLED_EVT */
+      break;
+
+    case CUSTOM_STM_RX_NOTIFY_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_RX_NOTIFY_DISABLED_EVT */
+
+      /* USER CODE END CUSTOM_STM_RX_NOTIFY_DISABLED_EVT */
       break;
 
     case CUSTOM_STM_NOTIFICATION_COMPLETE_EVT:
@@ -159,6 +182,11 @@ void Custom_APP_Notification(Custom_App_ConnHandle_Not_evt_t *pNotification)
 void Custom_APP_Init(void)
 {
   /* USER CODE BEGIN CUSTOM_APP_Init */
+	UTIL_SEQ_RegTask(1 << CFG_TASK_DUMMY, UTIL_SEQ_RFU, SPP_Transmit);
+
+	sprintf(a_SzString, "BLE Manual Transmit\r\n");
+
+	HAL_TIM_Base_Start_IT(&htim2);
 
   /* USER CODE END CUSTOM_APP_Init */
   return;
@@ -175,7 +203,56 @@ void Custom_APP_Init(void)
  *************************************************************/
 
 /* icmService */
+__USED void Custom_Rx_Update_Char(void) /* Property Read */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Rx_UC_1*/
+
+  /* USER CODE END Rx_UC_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_RX, (uint8_t *)UpdateCharData);
+  }
+
+  /* USER CODE BEGIN Rx_UC_Last*/
+
+  /* USER CODE END Rx_UC_Last*/
+  return;
+}
+
+void Custom_Rx_Send_Notification(void) /* Property Notification */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Rx_NS_1*/
+
+  /* USER CODE END Rx_NS_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_RX, (uint8_t *)NotifyCharData);
+  }
+
+  /* USER CODE BEGIN Rx_NS_Last*/
+
+  /* USER CODE END Rx_NS_Last*/
+
+  return;
+}
 
 /* USER CODE BEGIN FD_LOCAL_FUNCTIONS*/
+void SPP_Transmit(void){
+	SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&a_SzString[0]);
+}
 
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
+	if (htim == &htim2){
+
+		UTIL_SEQ_SetTask(1 << CFG_TASK_DUMMY, CFG_SCH_PRIO_0);
+		HAL_GPIO_TogglePin(STAT_GPIO_Port, STAT_Pin);
+
+	}
+}
 /* USER CODE END FD_LOCAL_FUNCTIONS*/

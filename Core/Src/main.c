@@ -69,6 +69,8 @@ IPCC_HandleTypeDef hipcc;
 
 RTC_HandleTypeDef hrtc;
 
+TIM_HandleTypeDef htim2;
+
 /* USER CODE BEGIN PV */
 // LTC4162 Variables
 LTC4162 ltc;
@@ -134,6 +136,7 @@ static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_RTC_Init(void);
 static void MX_IPCC_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 static void ISCC_GPIO_Init(void);
 //static void ADC_Init(void);
@@ -190,18 +193,19 @@ int main(void)
   MX_I2C1_Init();
   MX_RTC_Init();
   MX_USB_Device_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   sts40_TXCODE =  0xFD;
 
-//  HAL_Delay(3000);
-//
-//  PrintPC("\r\n\r\nInitiate RTC");
-//  RTC_Init();
-//
-//  PrintPC("\r\n\r\nASTI iSCC FW: 1.0.1");
-//
-//  PrintPC("\r\n\r\nInitiate LTC Device");
-//  LTC_Init();
+  HAL_Delay(3000);
+
+  PrintPC("\r\n\r\nInitiate RTC");
+  RTC_Init();
+
+  PrintPC("\r\n\r\nASTI iSCC FW: 1.0.1");
+
+  PrintPC("\r\n\r\nInitiate LTC Device");
+  LTC_Init();
 
 //  ADC_Init();
 //  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buff, 32);
@@ -310,7 +314,7 @@ void PeriphCommonClock_Config(void)
     Error_Handler();
   }
   /* USER CODE BEGIN Smps */
-//  LL_HSEM_1StepLock( HSEM, 5);
+  LL_HSEM_1StepLock( HSEM, 5);
   /* USER CODE END Smps */
 }
 
@@ -482,6 +486,51 @@ static void MX_RTC_Init(void)
 }
 
 /**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 32000-1;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 3000-1;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -499,17 +548,17 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOE_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(CE5V_GPIO_Port, CE5V_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, STAT_Pin|CE5V_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(ENUVLO_GPIO_Port, ENUVLO_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : CE5V_Pin */
-  GPIO_InitStruct.Pin = CE5V_Pin;
+  /*Configure GPIO pins : STAT_Pin CE5V_Pin */
+  GPIO_InitStruct.Pin = STAT_Pin|CE5V_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(CE5V_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : ENUVLO_Pin */
   GPIO_InitStruct.Pin = ENUVLO_Pin;
