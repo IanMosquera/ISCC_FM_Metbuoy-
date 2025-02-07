@@ -24,6 +24,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -36,7 +37,7 @@
 #include "stm_queue.h"
 #include "stdint.h"
 #include "stdbool.h"
-//#include "usbd_cdc_if.h"
+#include "usbd_cdc_if.h"
 #include "LTC4162.h"
 #include "ASTI_RTC.h"
 
@@ -67,8 +68,6 @@ I2C_HandleTypeDef hi2c1;
 IPCC_HandleTypeDef hipcc;
 
 RTC_HandleTypeDef hrtc;
-
-TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
 // LTC4162 Variables
@@ -135,7 +134,6 @@ static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_RTC_Init(void);
 static void MX_IPCC_Init(void);
-static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 static void ISCC_GPIO_Init(void);
 //static void ADC_Init(void);
@@ -191,24 +189,25 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C1_Init();
   MX_RTC_Init();
-  MX_TIM2_Init();
+  MX_USB_Device_Init();
   /* USER CODE BEGIN 2 */
   sts40_TXCODE =  0xFD;
-  HAL_Delay(3000);
 
-  PrintPC("\r\n\r\nInitiate RTC");
+//  HAL_Delay(3000);
+//
+//  PrintPC("\r\n\r\nInitiate RTC");
 //  RTC_Init();
-
-  PrintPC("\r\n\r\nASTI iSCC FW: 1.0.1");
-
+//
+//  PrintPC("\r\n\r\nASTI iSCC FW: 1.0.1");
+//
 //  PrintPC("\r\n\r\nInitiate LTC Device");
-  LTC_Init();
+//  LTC_Init();
 
 //  ADC_Init();
 //  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buff, 32);
 
 
-  ISCC_GPIO_Init();
+//  ISCC_GPIO_Init();
 
 
   /* USER CODE END 2 */
@@ -220,7 +219,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
 
 
-	HAL_TIM_Base_Start_IT(&htim2);
+//	HAL_TIM_Base_Start_IT(&htim2);
 
   while (1)
   {
@@ -254,11 +253,12 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_HSE
-                              |RCC_OSCILLATORTYPE_LSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI48|RCC_OSCILLATORTYPE_HSI
+                              |RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
@@ -291,6 +291,7 @@ void SystemClock_Config(void)
 void PeriphCommonClock_Config(void)
 {
   RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
+  LL_HSEM_1StepLock( HSEM, 5);
 
   /** Initializes the peripherals clock
   */
@@ -472,51 +473,6 @@ static void MX_RTC_Init(void)
   /* USER CODE BEGIN RTC_Init 2 */
 
   /* USER CODE END RTC_Init 2 */
-
-}
-
-/**
-  * @brief TIM2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM2_Init(void)
-{
-
-  /* USER CODE BEGIN TIM2_Init 0 */
-
-  /* USER CODE END TIM2_Init 0 */
-
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-  /* USER CODE BEGIN TIM2_Init 1 */
-
-  /* USER CODE END TIM2_Init 1 */
-  htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 32000-1;
-  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 5000-1;
-  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM2_Init 2 */
-
-  /* USER CODE END TIM2_Init 2 */
 
 }
 
@@ -731,7 +687,7 @@ void PrintPC(char *szFormat, ...){
 						uintval = va_arg(ptArg, uint8_t *);
 						sprintf((char *) strDisplay, (char *) str, uintval);
 						i = 0;
-//						CDC_Transmit_FS((uint8_t *)strDisplay, strlen((char *)strDisplay));
+						CDC_Transmit_FS((uint8_t *)strDisplay, strlen((char *)strDisplay));
 						break;
 
 					case 'f':
@@ -740,7 +696,7 @@ void PrintPC(char *szFormat, ...){
 						fval = va_arg(ptArg, float *);
 						sprintf((char *) strDisplay, (char *) str, fval);
 						i = 0;
-//						CDC_Transmit_FS((uint8_t *)strDisplay, strlen((char *)strDisplay));
+						CDC_Transmit_FS((uint8_t *)strDisplay, strlen((char *)strDisplay));
 						break;
 
 					case 's':
@@ -749,7 +705,7 @@ void PrintPC(char *szFormat, ...){
 						sval = va_arg(ptArg, int8_t *);
 						sprintf((char *) strDisplay, (char *) str, sval);
 						i = 0;
-//						CDC_Transmit_FS((uint8_t *)strDisplay, strlen(strDisplay));
+						CDC_Transmit_FS((uint8_t *)strDisplay, strlen(strDisplay));
 						break;
 
 					default:

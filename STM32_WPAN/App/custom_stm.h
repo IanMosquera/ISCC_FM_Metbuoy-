@@ -34,20 +34,14 @@ extern "C" {
 /* Exported types ------------------------------------------------------------*/
 typedef enum
 {
-  /* SPP */
+  /* icmService */
   CUSTOM_STM_TX,
-  CUSTOM_STM_RX,
 } Custom_STM_Char_Opcode_t;
 
 typedef enum
 {
   /* Transmit */
-  CUSTOM_STM_TX_READ_EVT,
   CUSTOM_STM_TX_WRITE_NO_RESP_EVT,
-  /* Receive */
-  CUSTOM_STM_RX_READ_EVT,
-  CUSTOM_STM_RX_NOTIFY_ENABLED_EVT,
-  CUSTOM_STM_RX_NOTIFY_DISABLED_EVT,
   CUSTOM_STM_NOTIFICATION_COMPLETE_EVT,
 
   CUSTOM_STM_BOOT_REQUEST_EVT
@@ -74,7 +68,6 @@ typedef struct
 
 /* Exported constants --------------------------------------------------------*/
 extern uint16_t SizeTx;
-extern uint16_t SizeRx;
 
 /* USER CODE BEGIN EC */
 
@@ -97,7 +90,7 @@ tBleStatus Custom_STM_App_Update_Char(Custom_STM_Char_Opcode_t CharOpcode,  uint
 tBleStatus Custom_STM_App_Update_Char_Variable_Length(Custom_STM_Char_Opcode_t CharOpcode, uint8_t *pPayload, uint8_t size);
 tBleStatus Custom_STM_App_Update_Char_Ext(uint16_t Connection_Handle, Custom_STM_Char_Opcode_t CharOpcode, uint8_t *pPayload);
 /* USER CODE BEGIN EF */
-tBleStatus SPP_Update_Char(Custom_STM_Char_Opcode_t CharOpcode,  uint8_t *pPayload);
+
 /* USER CODE END EF */
 
 #ifdef __cplusplus

@@ -120,7 +120,7 @@
 /**
  * Device name configuration for Generic Access Service
  */
-#define CFG_GAP_DEVICE_NAME             "iSCC_FM2"
+#define CFG_GAP_DEVICE_NAME             "TEMPLATE"
 #define CFG_GAP_DEVICE_NAME_LENGTH      (8)
 
 /**
@@ -667,9 +667,7 @@ typedef enum
 #endif
   CFG_TASK_HCI_ASYNCH_EVT_ID,
   /* USER CODE BEGIN CFG_Task_Id_With_HCI_Cmd_t */
-	CFG_TASK_DUMMY,
-	CFG_TASK_READ_CHGDATA,
-	CFG_TASK_USER_SW1_PRESSED,
+
   /* USER CODE END CFG_Task_Id_With_HCI_Cmd_t */
   CFG_LAST_TASK_ID_WITH_HCICMD,                                               /**< Shall be LAST in the list */
 } CFG_Task_Id_With_HCI_Cmd_t;
