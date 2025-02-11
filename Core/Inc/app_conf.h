@@ -669,6 +669,9 @@ typedef enum
   /* USER CODE BEGIN CFG_Task_Id_With_HCI_Cmd_t */
 //	CFG_TASK_DUMMY,
 	CFG_TASK_READCHGDATA,
+	CFG_TASK_READTEMPDATA,
+	CFG_TASK_READCFBTREG,
+	CFG_TASK_READSYSSTREG,
   /* USER CODE END CFG_Task_Id_With_HCI_Cmd_t */
   CFG_LAST_TASK_ID_WITH_HCICMD,                                               /**< Shall be LAST in the list */
 } CFG_Task_Id_With_HCI_Cmd_t;
