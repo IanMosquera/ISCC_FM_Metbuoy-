@@ -30,6 +30,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "usbd_cdc_if.h"
+#include "LTC4162.h"
+#include "ASTI_RTC.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -72,11 +74,36 @@ static Custom_App_Context_t Custom_App_Context;
 uint8_t UpdateCharData[512];
 uint8_t NotifyCharData[512];
 uint16_t Connection_Handle;
+
 /* USER CODE BEGIN PV */
+
+extern I2C_HandleTypeDef hi2c1;
 extern TIM_HandleTypeDef htim2;
+
+extern LTC4162 ltc;
+
 
 static char	a_SzString[70];		/*buffer for everything else*/
 uint8_t txbuff[70];
+
+char system_Message[128];
+
+// ADC Variables
+extern float gIMON;
+
+// STS40 Variables
+extern uint8_t	STS40_RXBuffer[3];     // RX buffer for I2C
+extern uint8_t	sts40_TXCODE; 	// measure T with highest precision
+extern volatile float Temp_C;
+
+// RTC Variables
+extern RTC_HandleTypeDef hrtc;
+uint8_t aShowTime[16] = "hh:ms:ss";
+uint8_t aShowDateTime[20] = "YY/MM/DD,hh:ms:ss";
+uint8_t rtcTime[12]	=	 "12:03:00";
+uint8_t rtcDate[14]	=	 "24-02-01";
+RTC_TimeTypeDef sTime;
+RTC_DateTypeDef sDate;
 
 /* USER CODE END PV */
 
@@ -86,6 +113,11 @@ static void Custom_Rx_Update_Char(void);
 static void Custom_Rx_Send_Notification(void);
 
 /* USER CODE BEGIN PFP */
+void ReadChargingData(void);
+void ReadGIMON(void);
+void FilterCommands(uint8_t * pPayload, uint8_t Length);
+void ReadRTCTime(void);
+void ReadRTCDate(void);
 
 /* USER CODE END PFP */
 
@@ -104,7 +136,8 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
     /* icmService */
     case CUSTOM_STM_TX_WRITE_NO_RESP_EVT:
       /* USER CODE BEGIN CUSTOM_STM_TX_WRITE_NO_RESP_EVT */
-
+    	pNotification->DataTransfered.pPayload[pNotification->DataTransfered.Length] = '\0';
+    	FilterCommands(pNotification->DataTransfered.pPayload, pNotification->DataTransfered.Length);
       /* USER CODE END CUSTOM_STM_TX_WRITE_NO_RESP_EVT */
       break;
 
@@ -184,10 +217,13 @@ void Custom_APP_Notification(Custom_App_ConnHandle_Not_evt_t *pNotification)
 void Custom_APP_Init(void)
 {
   /* USER CODE BEGIN CUSTOM_APP_Init */
-	UTIL_SEQ_RegTask(1 << CFG_TASK_DUMMY, UTIL_SEQ_RFU, SPP_Transmit);
+//	UTIL_SEQ_RegTask(1 << CFG_TASK_DUMMY, UTIL_SEQ_RFU, SPP_Transmit);
+	UTIL_SEQ_RegTask(1 << CFG_TASK_READCHGDATA, UTIL_SEQ_RFU, ReadChargingData);
+
 
 	sprintf(a_SzString, "BLE Transmit Test\r\n");
 
+	// Start Timer for Reading Charging Data
 	HAL_TIM_Base_Start_IT(&htim2);
 
   /* USER CODE END CUSTOM_APP_Init */
@@ -195,6 +231,176 @@ void Custom_APP_Init(void)
 }
 
 /* USER CODE BEGIN FD */
+void ReadChargingData(void){
+//	RTC_ReadDate(rtcDate);
+//	RTC_ReadTime(rtcTime);
+
+
+	LTC4162_ReadVIN(&ltc);
+	LTC4162_ReadIIN(&ltc);
+	LTC4162_ReadVOUT(&ltc);
+	LTC4162_ReadVBAT(&ltc);
+	LTC4162_ReadIBAT(&ltc);
+	LTC4162_ReadDieTemp(&ltc);
+	LTC4162_ReadChargerState(&ltc);
+	LTC4162_ReadChargeStatus(&ltc);
+	LTC4162_ReadNTC(&ltc);
+	GetSTS40TempC();
+//	ReadGIMON();
+
+	sprintf((char *)system_Message, "%5.2f, "
+																	"%6.3f, "
+																	"%5.2f, "
+																	"%6.3f, "
+																	"%5.2f, "
+																	//"%.4f, "
+																	"%s, "
+																	"%s, "
+																	"%.2f, "
+																	"%.2f, "
+																	"%.2f\r\n",
+																	ltc.vIN,
+																	ltc.iIN,
+																	ltc.vBAT,
+																	ltc.iBAT,
+																	ltc.vOUT,
+																	//gIMON,
+																	ltc.chargerStateStr,
+																	ltc.chargeStatusStr,
+																	ltc.dieTemp,
+																	ltc.NTCDegrees,
+																	Temp_C);
+
+	SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
+
+}
+
+void FilterCommands(uint8_t * pPayload, uint8_t Length){
+	uint8_t address, buf[2];
+	uint8_t str[64];
+	uint16_t val;
+
+	// For LTC
+	if ((pPayload[0]=='L') & (pPayload[1]=='T') & (pPayload[2]=='C')){
+		// Read Register
+		if (pPayload[3]=='R'){
+			address = (hexCharToInt(pPayload[4]) << 4) | hexCharToInt(pPayload[5]);
+			LTC4162_ReadRegisters(&ltc, address, buf, 2);
+			val = (buf[1] << 8) | buf[0];
+
+			sprintf((char *)system_Message,"REG 0x%02X: %d\r\n",address, val);
+			SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
+
+		// Write Register
+		}else if (pPayload[3]=='W' && pPayload[6] == ':'){
+			address = (hexCharToInt(pPayload[4]) << 4) |  hexCharToInt(pPayload[5]); 			// Covert Hex to Integer
+			if (pPayload[11] == '\0'){
+				buf[0] = (hexCharToInt(pPayload[7]) << 4) |  hexCharToInt(pPayload[8]); /*Covert Hex to Integer*/
+				HAL_StatusTypeDef status = HAL_I2C_Mem_Write(&hi2c1, LTC4162_I2C_ADDR, address, 1, buf, 2, HAL_MAX_DELAY);
+				if (status != HAL_OK) status = 1;
+			}else if (pPayload[13] =='\0'){
+				buf[0] = (hexCharToInt(pPayload[9]) << 4) |  hexCharToInt(pPayload[10]); /*Covert Hex to Integer*/
+				buf[1] = (hexCharToInt(pPayload[7]) << 4) |  hexCharToInt(pPayload[8]); /*Covert Hex to Integer*/
+				HAL_StatusTypeDef status = HAL_I2C_Mem_Write(&hi2c1, LTC4162_I2C_ADDR, address, 1, buf, 2, HAL_MAX_DELAY);
+				if (status != HAL_OK) status = 1;
+			}
+		}
+		else{
+			// Transmit other else string
+			// HAL_UART_Transmit(&huart1, pPayload, Length, HAL_MAX_DELAY);
+		}
+	}
+	/*For RTC*/
+	else if((pPayload[0]=='R') & (pPayload[1]=='T') & (pPayload[2]=='C')){
+		if ((pPayload[3]=='R') & (pPayload[4]=='T')){
+			/*ReadRTCTime*/
+			uint8_t str[64];
+			RTC_ReadTime(aShowTime);
+			sprintf((char *)str,"%s\r\n",aShowTime);															/*Copy to tring*/
+//			HAL_UART_Transmit(&huart1, str, strlen((char *)str), HAL_MAX_DELAY);	/*Transmit to UART*/
+			SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&str[0]);										/*Transmit to BLE*/
+		}
+		else if((pPayload[3]=='R') & (pPayload[4]=='D') & (pPayload[5]=='\r')){
+			/*ReadRTCDate*/
+			uint8_t str[64];
+			RTC_ReadDate(aShowTime);
+			sprintf((char *)str,"%s\r\n",aShowTime);															/*Copy to tring*/
+//			HAL_UART_Transmit(&huart1, str, strlen((char *)str), HAL_MAX_DELAY);	/*Transmit to UART*/
+			SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&str[0]);										/*Transmit to BLE*/
+		}
+		else if ((pPayload[3]=='R') & (pPayload[4]=='D') & (pPayload[5]=='T')){
+			/*ReadRTCDate*/
+			uint8_t str[64];
+			RTC_ReadDateTime(aShowDateTime);
+			sprintf((char *)str,"%s\r\n",aShowDateTime);															/*Copy to tring*/
+//			HAL_UART_Transmit(&huart1, str, strlen((char *)str), HAL_MAX_DELAY);			/*Transmit to UART*/
+			SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&str[0]);												/*Transmit to BLE*/
+		}
+		else if((pPayload[3]=='W') & (pPayload[4]=='T')){
+		  RTC_TimeTypeDef	 sTime = 	{0};
+		  uint8_t hrs = ((pPayload[6]  - 48) * 10) + (pPayload[7]  - 48);
+		  uint8_t min = ((pPayload[9]  - 48) * 10) + (pPayload[10] - 48);
+		  uint8_t sec = ((pPayload[12] - 48) * 10) + (pPayload[13] - 48);
+			sTime.Hours = hrs;
+			sTime.Minutes = min;
+			sTime.Seconds = sec;
+			RTC_WriteTime(&sTime);
+		}
+		else if((pPayload[3]=='W') & (pPayload[4]=='D') & (pPayload[5]==':')){
+			RTC_DateTypeDef	 sDate = 	{0};
+			uint8_t yrs = ((pPayload[6]  - 48) * 10) + (pPayload[7]  - 48);
+			uint8_t mon = ((pPayload[9]  - 48) * 10) + (pPayload[10] - 48);
+			uint8_t day = ((pPayload[12] - 48) * 10) + (pPayload[13] - 48);
+			sDate.Year = yrs;
+			sDate.Month = mon;
+			sDate.Date = day;
+			RTC_WriteDate(&sDate);
+		}
+		else if((pPayload[3]=='W') & (pPayload[4]=='D') & (pPayload[5]=='T')){
+			RTC_DateTypeDef	 sDate = 	{0};
+			uint8_t yrs = ((pPayload[7]  - 48) * 10) + (pPayload[8]  - 48);
+			uint8_t mon = ((pPayload[10] - 48) * 10) + (pPayload[11] - 48);
+			uint8_t day = ((pPayload[13] - 48) * 10) + (pPayload[14] - 48);
+			sDate.Year = yrs;
+			sDate.Month = mon;
+			sDate.Date = day;
+
+			RTC_TimeTypeDef	 sTime = 	{0};
+			uint8_t hrs = ((pPayload[16] - 48) * 10) + (pPayload[17]  - 48);
+			uint8_t min = ((pPayload[19] - 48) * 10) + (pPayload[20] - 48);
+			uint8_t sec = ((pPayload[22] - 48) * 10) + (pPayload[23] - 48);
+			sTime.Hours = hrs;
+			sTime.Minutes = min;
+			sTime.Seconds = sec;
+
+			RTC_WriteDateTime(&sTime, &sDate);
+		}
+	}
+}
+
+void ReadRTCTime(void){
+	//Get RTC time, other parameters to be displayed are taken from
+	HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+
+
+	//Save time to buffer
+	sprintf((char *)rtcTime,   "%02d:%02d:%02d", sTime.Hours, sTime.Minutes, sTime.Seconds);
+}
+
+void ReadRTCDate(void){
+	//Get RTC time, other parameters to be displayed are taken from
+	HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+	//Save date to buffer
+	sprintf((char *)rtcDate,   "%02d-%02d-%02d ", sDate.Year, sDate.Month, sDate.Date);
+}
+
+void ReadGIMON(void){
+//	uint16_t temp;
+//
+//	temp = (adc_buff_average[0] + adc_buff_average[1]);
+//	gIMON = (temp * ( 1.765f/4096.0f)) *5.0125;
+}
+
 
 /* USER CODE END FD */
 
@@ -246,17 +452,17 @@ void Custom_Rx_Send_Notification(void) /* Property Notification */
 
 /* USER CODE BEGIN FD_LOCAL_FUNCTIONS*/
 void SPP_Transmit(void){
-
 	SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&a_SzString[0]);
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if (htim == &htim2){
+		UTIL_SEQ_SetTask(1 << CFG_TASK_READCHGDATA, CFG_SCH_PRIO_0);
 
-		sprintf((char *)txbuff,"USB Transmit Test\r\n");
-		CDC_Transmit_FS(txbuff, strlen((char *)txbuff));
+//		sprintf((char *)txbuff,"USB Transmit Test\r\n");
+//		CDC_Transmit_FS(txbuff, strlen((char *)txbuff));
+		PrintPC("%s", system_Message);
 
-		UTIL_SEQ_SetTask(1 << CFG_TASK_DUMMY, CFG_SCH_PRIO_0);
 		HAL_GPIO_TogglePin(STAT_GPIO_Port, STAT_Pin);
 
 	}

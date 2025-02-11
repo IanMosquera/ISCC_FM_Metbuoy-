@@ -84,10 +84,10 @@ static char str[133], strDisplay[133];
 //char 		DataString[60][85];
 //char 		TempData[70] = "14.11,0.9659,14.08,13.11,00.8331,46.00,0512,0008,0.127,29.42";
 //char 		LineBuff[12][8];
-//
+
 //uint8_t txbuff[70];
 //uint8_t i, idx, c, x;
-//
+
 //uint32_t FirstPage = 0, NbOfPages = 0;
 //uint32_t Address = 0, PageError = 0;
 
@@ -116,11 +116,11 @@ uint8_t longpress_duration;
 /* START - UART variables */
 uint8_t UART1_rxBuffer[12] = {0};
 
-
-//STS40 Variables
+// STS40 Variables
 uint8_t	STS40_RXBuffer[3];     // RX buffer for I2C
 uint8_t	sts40_TXCODE; 	// measure T with highest precision
 volatile float Temp_C;
+
 
 /*char my_uart_buffer[256];
 int my_uart_buffer_index = 0;*/
@@ -711,13 +711,13 @@ void GetSTS40TempC(void){
 }
 
 void PrintPC(char *szFormat, ...){
-  uint8_t i;
-  uint8_t *uintval;
-  float *fval;
-  int8_t *sval;
-  uint8_t fmtDetect;
-  char  *pt;
-  va_list ptArg;
+  uint8_t 	i;
+  uint8_t 	*uintval;
+  float 		*fval;
+  int8_t 		*sval;
+  uint8_t 	fmtDetect;
+  char  		*pt;
+  va_list 	ptArg;
 
   if (BusyFlag == FREE_FLAG){
 		BusyFlag = BUSY_FLAG;
