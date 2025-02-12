@@ -518,10 +518,21 @@ void Custom_Rx_Send_Notification(void) /* Property Notification */
 }
 
 /* USER CODE BEGIN FD_LOCAL_FUNCTIONS*/
+
+/**
+ *  @brief	Custom function for updating character value
+ *  @param	None
+ *  @retval 	None
+ */
 void SPP_Transmit(void){
-	SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&a_SzString[0]);
+  SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&a_SzString[0]);
 }
 
+/**
+ *  @brief	Timer interrupt function for performing registered tasks
+ *  @param	*htim	Timer handler
+ *  @retval 	None
+ */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if (htim == &htim2){
 
@@ -531,7 +542,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 		UTIL_SEQ_SetTask(1 << CFG_TASK_READSYSSTREG, CFG_SCH_PRIO_0);
 
 		HAL_GPIO_TogglePin(STAT_GPIO_Port, STAT_Pin);
-
 	}
 }
 /* USER CODE END FD_LOCAL_FUNCTIONS*/
