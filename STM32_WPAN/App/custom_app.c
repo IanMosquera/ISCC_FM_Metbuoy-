@@ -226,9 +226,6 @@ void Custom_APP_Init(void)
 	UTIL_SEQ_RegTask(1 << CFG_TASK_READCFBTREG, UTIL_SEQ_RFU, ReadConfigBitsRegister);
 	UTIL_SEQ_RegTask(1 << CFG_TASK_READSYSSTREG, UTIL_SEQ_RFU, ReadSystemStatusRegister);
 
-
-
-
 	sprintf(a_SzString, "BLE Transmit Test\r\n");
 
 	// Start Timer for Reading Charging Data
@@ -293,12 +290,20 @@ void ReadTempData(void){
 void ReadConfigBitsRegister(void){
 	LTC4162_ReadConfigBitsReg(&ltc);
 
-	sprintf((char *)system_Message, "CON_BITS_REG: %s %s %s %s %s\r\n",
-			ltc.confBits.mppt_en?"mppt_en":"-",
-			ltc.confBits.force_telemetry_on?"force_tel_ON":"-",
-			ltc.confBits.telemetry_speed?"tel_HS":"-",
-			ltc.confBits.run_bsr?"run_bsr":"-",
-			ltc.confBits.suspend_charger?"susp_chg":"-");
+	// If there is sun, reset system configuration to zero
+	if (ltc.ssReg.vin_gt_vbat){
+		LTC4162_WriteConfigBitsReg(&ltc, zero_cfg);
+	}
+	else {
+		LTC4162_WriteConfigBitsReg(&ltc, force_telemetry_on | telemetry_speed);
+	}
+
+	sprintf((char *)system_Message, "CON_BITS: %s%s%s%s%s\r\n",
+			ltc.confBits.mppt_en?"mppt_en, ":"",
+			ltc.confBits.force_telemetry_on?"f_tel_on, ":"",
+			ltc.confBits.telemetry_speed?"tel_HS, ":"",
+			ltc.confBits.run_bsr?"run_bsr, ":"",
+			ltc.confBits.suspend_charger?"susp_chg ":"");
 
 	SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
 	PrintPC("%s", system_Message);
@@ -306,17 +311,17 @@ void ReadConfigBitsRegister(void){
 
 void ReadSystemStatusRegister(void){
 	LTC4162_ReadSystemStatusReg(&ltc);
-//	if (ltc.ssReg.vin_gt_vbat) LTC4162_WriteConfigBitsReg(&ltc, force_telemetry_on | telemetry_speed);
+	// if (ltc.ssReg.vin_gt_vbat) LTC4162_WriteConfigBitsReg(&ltc, force_telemetry_on | telemetry_speed);
 
-	sprintf((char *)system_Message, "SYS_STAT_REG: %s %s %s %s %s %s %s %s\r\n",
-				ltc.ssReg.intvcc_gt_2p8v?"intvcc>2.8v":"-",
-				ltc.ssReg.vin_gt_4p2v?"vin>4.2v":"-",
-				ltc.ssReg.vin_gt_vbat?"vin>vbat":"-",
-				ltc.ssReg.vin_ovlo?"vin_ovlo":"-",
-				ltc.ssReg.thermal_shutdown?"thm_shdn":"-",
-				ltc.ssReg.no_rt?"no_rt":"-",
-				ltc.ssReg.cell_count_err?"cellctr_err":"-",
-				ltc.ssReg.en_chg?"en_chg":"-");
+	sprintf((char *)system_Message, "SYS_STAT: %s%s%s%s%s%s%s%s\r\n",
+				ltc.ssReg.intvcc_gt_2p8v?"intvcc>2.8v, ":"",
+				ltc.ssReg.vin_gt_4p2v?"vin>4.2v, ":"",
+				ltc.ssReg.vin_gt_vbat?"vin>vbat, ":"",
+				ltc.ssReg.vin_ovlo?"vin_ovlo, ":"",
+				ltc.ssReg.thermal_shutdown?"thm_shdn, ":"",
+				ltc.ssReg.no_rt?"no_rt, ":"",
+				ltc.ssReg.cell_count_err?"cell_ctr_err, ":"",
+				ltc.ssReg.en_chg?"en_chg ":"");
 
 		SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
 		PrintPC("%s", system_Message);
@@ -342,8 +347,8 @@ void ReadOutCurrent(void){
 			ltc.iOUT = ltc.iIN;
 		}
 	}else{
-		//SetConfigBitsReg(&ltc, force_telemetry_on | telemetry_speed);
-		LTC4162_WriteConfigBitsReg(&ltc, force_telemetry_on | telemetry_speed);
+		// SetConfigBitsReg(&ltc, force_telemetry_on | telemetry_speed);
+
 		ltc.iOUT = ltc.iBAT;
 	}
 
@@ -368,9 +373,9 @@ void FilterCommands(uint8_t * pPayload, uint8_t Length){
 
 		// Write Register
 		}else if (pPayload[3]=='W' && pPayload[6] == ':'){
-			address = (hexCharToInt(pPayload[4]) << 4) |  hexCharToInt(pPayload[5]); 			// Covert Hex to Integer
+			address = (hexCharToInt(pPayload[4]) << 4) |  hexCharToInt(pPayload[5]);  /* Covert Hex to Integer*/
 			if (pPayload[11] == '\0'){
-				buf[0] = (hexCharToInt(pPayload[7]) << 4) |  hexCharToInt(pPayload[8]); /*Covert Hex to Integer*/
+				buf[0] = (hexCharToInt(pPayload[7]) << 4) |  hexCharToInt(pPayload[8]); /* Covert Hex to Integer*/
 				HAL_StatusTypeDef status = HAL_I2C_Mem_Write(&hi2c1, LTC4162_I2C_ADDR, address, 1, buf, 2, HAL_MAX_DELAY);
 				if (status != HAL_OK) status = 1;
 			}else if (pPayload[13] =='\0'){
@@ -524,14 +529,12 @@ void SPP_Transmit(void){
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if (htim == &htim2){
-
 		UTIL_SEQ_SetTask(1 << CFG_TASK_READCHGDATA, CFG_SCH_PRIO_0);
 		UTIL_SEQ_SetTask(1 << CFG_TASK_READCFBTREG, CFG_SCH_PRIO_0);
-		UTIL_SEQ_SetTask(1 << CFG_TASK_READTEMPDATA, CFG_SCH_PRIO_0);
 		UTIL_SEQ_SetTask(1 << CFG_TASK_READSYSSTREG, CFG_SCH_PRIO_0);
+		// UTIL_SEQ_SetTask(1 << CFG_TASK_READTEMPDATA, CFG_SCH_PRIO_0);
 
 		HAL_GPIO_TogglePin(STAT_GPIO_Port, STAT_Pin);
-
 	}
 }
 /* USER CODE END FD_LOCAL_FUNCTIONS*/
