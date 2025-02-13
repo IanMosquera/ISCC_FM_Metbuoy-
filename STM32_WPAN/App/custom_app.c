@@ -237,8 +237,8 @@ void Custom_APP_Init(void)
 
 /* USER CODE BEGIN FD */
 void ReadChargingData(void){
-//	RTC_ReadDate(rtcDate);
-//	RTC_ReadTime(rtcTime);
+	RTC_ReadDate(rtcDate);
+	RTC_ReadTime(rtcTime);
 
 	LTC4162_ReadIIN(&ltc);
 	LTC4162_ReadIBAT(&ltc);
@@ -311,7 +311,6 @@ void ReadConfigBitsRegister(void){
 
 void ReadSystemStatusRegister(void){
 	LTC4162_ReadSystemStatusReg(&ltc);
-	// if (ltc.ssReg.vin_gt_vbat) LTC4162_WriteConfigBitsReg(&ltc, force_telemetry_on | telemetry_speed);
 
 	sprintf((char *)system_Message, "SYS_STAT: %s%s%s%s%s%s%s%s\r\n",
 				ltc.ssReg.intvcc_gt_2p8v?"intvcc>2.8v, ":"",
