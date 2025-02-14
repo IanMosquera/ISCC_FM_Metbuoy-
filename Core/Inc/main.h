@@ -62,7 +62,6 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 void GetSTS40TempC(void);
-
 void PrintPC(char *szFormat, ...);
 /* USER CODE END EFP */
 
