@@ -32,6 +32,7 @@
 #include "usbd_cdc_if.h"
 #include "LTC4162.h"
 #include "ASTI_RTC.h"
+#include  "Water_Senix.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -82,10 +83,11 @@ extern TIM_HandleTypeDef htim2;
 extern LTC4162 ltc;
 
 
+
 static char	a_SzString[70];		/*buffer for everything else*/
 uint8_t txbuff[70];
 
-char system_Message[128];
+extern char system_Message[128];
 
 // ADC Variables
 extern float gIMON;
@@ -104,6 +106,11 @@ uint8_t rtcDate[14]	=	 "24-02-01";
 RTC_TimeTypeDef sTime;
 RTC_DateTypeDef sDate;
 
+// Sensor Variables
+extern Senix_t senix;
+extern UART_HandleTypeDef huart1;
+
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -118,6 +125,7 @@ void ReadConfigBitsRegister(void);
 void ReadSystemStatusRegister(void);
 void ReadGIMON(void);
 void ReadOutCurrent(void);
+void GetDistance(void);
 void FilterCommands(uint8_t * pPayload, uint8_t Length);
 void ReadRTCTime(void);
 void ReadRTCDate(void);
@@ -225,11 +233,15 @@ void Custom_APP_Init(void)
 	UTIL_SEQ_RegTask(1 << CFG_TASK_READTEMPDATA, UTIL_SEQ_RFU, ReadTempData);
 	UTIL_SEQ_RegTask(1 << CFG_TASK_READCFBTREG, UTIL_SEQ_RFU, ReadConfigBitsRegister);
 	UTIL_SEQ_RegTask(1 << CFG_TASK_READSYSSTREG, UTIL_SEQ_RFU, ReadSystemStatusRegister);
+	UTIL_SEQ_RegTask(1 << CFG_TASK_READSENSOR, UTIL_SEQ_RFU, GetDistance);
 
 	sprintf(a_SzString, "BLE Transmit Test\r\n");
 
 	// Start Timer for Reading Charging Data
 	HAL_TIM_Base_Start_IT(&htim2);
+
+
+	// Start Uart Interrupt
 
   /* USER CODE END CUSTOM_APP_Init */
   return;
@@ -351,6 +363,13 @@ void ReadOutCurrent(void){
 		ltc.iOUT = ltc.iBAT;
 	}
 
+
+}
+
+
+void GetDistance(void){
+	SensorPollSenix();
+	SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&senix.strBuffer[0]);
 
 }
 
@@ -539,12 +558,23 @@ void SPP_Transmit(void){
  */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if (htim == &htim2){
-		UTIL_SEQ_SetTask(1 << CFG_TASK_READCHGDATA, CFG_SCH_PRIO_0);
-		UTIL_SEQ_SetTask(1 << CFG_TASK_READCFBTREG, CFG_SCH_PRIO_0);
-		UTIL_SEQ_SetTask(1 << CFG_TASK_READSYSSTREG, CFG_SCH_PRIO_0);
-		// UTIL_SEQ_SetTask(1 << CFG_TASK_READTEMPDATA, CFG_SCH_PRIO_0);
+//		UTIL_SEQ_SetTask(1 << CFG_TASK_READCHGDATA, CFG_SCH_PRIO_0);
+//		UTIL_SEQ_SetTask(1 << CFG_TASK_READCFBTREG, CFG_SCH_PRIO_0);
+//		UTIL_SEQ_SetTask(1 << CFG_TASK_READSYSSTREG, CFG_SCH_PRIO_0);
+//		UTIL_SEQ_SetTask(1 << CFG_TASK_READTEMPDATA, CFG_SCH_PRIO_0);
+		UTIL_SEQ_SetTask(1 << CFG_TASK_READSENSOR, CFG_SCH_PRIO_0);
 
 		HAL_GPIO_TogglePin(STAT_GPIO_Port, STAT_Pin);
 	}
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
+
+	sprintf((char *)senix.strBuffer,
+				"Water Level(cm): %3.2f\r\n",
+				senix.distance);
+
+	HAL_UART_Receive_IT(&huart1, senix.rxBuffer, 19);
+
 }
 /* USER CODE END FD_LOCAL_FUNCTIONS*/

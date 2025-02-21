@@ -38,8 +38,10 @@
 #include "stdint.h"
 #include "stdbool.h"
 #include "usbd_cdc_if.h"
+
 #include "LTC4162.h"
 #include "ASTI_RTC.h"
+#include "Water_Senix.h"
 
 /* USER CODE END Includes */
 
@@ -71,7 +73,13 @@ RTC_HandleTypeDef hrtc;
 
 TIM_HandleTypeDef htim2;
 
+UART_HandleTypeDef huart1;
+
 /* USER CODE BEGIN PV */
+
+// Global Variable
+char system_Message[128];
+
 // LTC4162 Variables
 LTC4162 ltc;
 
@@ -79,23 +87,7 @@ LTC4162 ltc;
 uint8_t BusyFlag = FREE_FLAG;
 static char str[133], strDisplay[133];
 
-
-/* START - FLASH Program variables */
-//char 		DataString[60][85];
-//char 		TempData[70] = "14.11,0.9659,14.08,13.11,00.8331,46.00,0512,0008,0.127,29.42";
-//char 		LineBuff[12][8];
-
-//uint8_t txbuff[70];
-//uint8_t i, idx, c, x;
-
-//uint32_t FirstPage = 0, NbOfPages = 0;
-//uint32_t Address = 0, PageError = 0;
-
-//static FLASH_EraseInitTypeDef EraseInitStruct;
-/* END - FLASH Program variables */
-
-
-/* START - ADC variables */
+// ADC variables
 extern uint16_t	buf_avg[2];
 uint16_t adc_buff[32];
 uint16_t adc_buff_average[2];
@@ -105,7 +97,7 @@ uint16_t 	ACU_Current_Consumption;
 uint32_t 	adcval;
 double 		AVE_Current_Consumption;
 double 		MAX9938Vout;
-/* END - ADC variables */
+
 
 /* START - Switch variables */
 uint8_t switch_Mode;
@@ -113,8 +105,11 @@ uint8_t switch_Counter;
 uint8_t longpress_duration;
 /* End - Switch variables */
 
-/* START - UART variables */
-uint8_t UART1_rxBuffer[12] = {0};
+// Water Level Variables
+Senix_t senix;
+uint8_t UART1_txBuffer[10];
+uint8_t UART1_rxBuffer[20];
+
 
 // STS40 Variables
 uint8_t	STS40_RXBuffer[3];     // RX buffer for I2C
@@ -137,6 +132,7 @@ static void MX_I2C1_Init(void);
 static void MX_RTC_Init(void);
 static void MX_IPCC_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 static void ISCC_GPIO_Init(void);
 //static void ADC_Init(void);
@@ -194,12 +190,13 @@ int main(void)
   MX_RTC_Init();
   MX_USB_Device_Init();
   MX_TIM2_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   sts40_TXCODE =  0xFD;
 
   HAL_Delay(3000);
 
-  PrintPC("\r\n\r\nInitiate RTC");
+	PrintPC("\r\n\r\nInitiate RTC");
   RTC_Init();
 
   PrintPC("\r\n\r\nASTI iSCC FW: 1.0.1");
@@ -207,12 +204,9 @@ int main(void)
   PrintPC("\r\n\r\nInitiate LTC Device");
   LTC_Init();
 
-//  ADC_Init();
-//  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buff, 32);
-
-
-//  ISCC_GPIO_Init();
-
+  // Senix
+  AssignCommandCode();
+	HAL_UART_Receive_IT(&huart1, senix.rxBuffer, 19);
 
   /* USER CODE END 2 */
 
@@ -222,11 +216,9 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-
-//	HAL_TIM_Base_Start_IT(&htim2);
-
   while (1)
   {
+
     /* USER CODE END WHILE */
     MX_APPE_Process();
 
@@ -506,7 +498,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 32000-1;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 3000-1;
+  htim2.Init.Period = 5000-1;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -527,6 +519,54 @@ static void MX_TIM2_Init(void)
   /* USER CODE BEGIN TIM2_Init 2 */
 
   /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 9600;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
 
 }
 
@@ -635,60 +675,6 @@ static void ISCC_GPIO_Init(void)
 
 
 
-
-//void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-//{
-//	if (htim == &htim16)
-//	{
-//		Increment_ADC_Timer_Counter();
-//	}
-//}
-
-
-//void uart1_handler(void){
-//  char buff;
-//  HAL_UART_Receive (&huart1, (uint8_t *)&buff, 1, 400);
-//  my_uart_buffer[my_uart_buffer_index++] = buff;
-//}
-//
-//void uart1_idleHandler(void){
-//  my_uart_buffer_index = 0;
-//}
-
-//void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc){
-//	uint16_t i;
-//
-//	adc_buff_average[0] = 0;
-//
-//	for(i = 0; i < 32; i++){
-//		adc_buff_average[0] = adc_buff_average[0] + (adc_buff[i] / 32);
-//	}
-//}
-
-//void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc){
-//	uint16_t i;
-//
-//	adc_buff_average[1] = 0;
-//
-//	for(i = 0; i < 32; i++){
-//		adc_buff_average[1] = adc_buff_average[1] + (adc_buff[i] / 32);
-//	}
-//}
-
-
-
-//static void ADC_Init(void)
-//{
-//	uint8_t i;
-//	adc_buff_average[0] = 0;
-//	adc_buff_average[1] = 0;
-//
-//	for(i = 0; i < 32; i++)
-//	{
-//		adc_buff_average[i] = 0x0000 + 1;
-//	}
-//}
-
 void GetSTS40TempC(void){
 	uint16_t rawTemp;
 	HAL_StatusTypeDef status;
@@ -773,6 +759,9 @@ void PrintPC(char *szFormat, ...){
 		BusyFlag = FREE_FLAG;
   }
 }
+
+
+
 /* USER CODE END 4 */
 
 /**
