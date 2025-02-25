@@ -32,7 +32,8 @@
 #include "usbd_cdc_if.h"
 #include "LTC4162.h"
 #include "ASTI_RTC.h"
-#include  "Water_Senix.h"
+#include "Water_Senix.h"
+#include "Airmar.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -108,8 +109,12 @@ RTC_DateTypeDef sDate;
 
 // Sensor Variables
 extern Senix_t senix;
-extern UART_HandleTypeDef huart1;
+extern Airmar_t airmar;
 
+extern UART_HandleTypeDef huart1;
+uint8_t uart_buff[100];
+uint8_t uart_data;
+uint8_t uart_index = 0;
 
 /* USER CODE END PV */
 
@@ -243,6 +248,18 @@ void Custom_APP_Init(void)
 
 	// Start Uart Interrupt
 
+#if UART_Senix
+	AssignCommandCode();
+	HAL_UART_Receive_IT(&huart1, senix.rxBuffer, 19);
+
+#elif UART_Airmar
+	airmar.charIndex = 0;
+	HAL_UART_Receive_IT(&huart1, &airmar.rxChar, 1);
+#endif
+
+	// HAL_UART_Receive_IT(&huart1, &uart_data, 1);
+
+
   /* USER CODE END CUSTOM_APP_Init */
   return;
 }
@@ -368,8 +385,13 @@ void ReadOutCurrent(void){
 
 
 void GetDistance(void){
-	SensorPollSenix();
-	SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&senix.strBuffer[0]);
+
+	uint8_t m[10];
+	sprintf((char *)m,"test\r\n");
+	HAL_UART_Transmit(&huart1, m, 6, HAL_MAX_DELAY);
+
+	//	SensorPollSenix();
+	//SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&senix.strBuffer[0]);
 
 }
 
@@ -568,13 +590,36 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	}
 }
 
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 
+#if UART_Senix
 	sprintf((char *)senix.strBuffer,
 				"Water Level(cm): %3.2f\r\n",
 				senix.distance);
-
 	HAL_UART_Receive_IT(&huart1, senix.rxBuffer, 19);
 
+#elif UART_Airmar
+
+	GetDataChar();
+	HAL_UART_Receive_IT(&huart1, &airmar.rxChar, 1);
+
+//	GetDataChar();
+#endif
+
+
+//	if (uart_data == '\r'){
+//		uart_buff[uart_index] = '\0';
+//	}
+//	else{
+//		uart_buff[uart_index++] = uart_data;
+//		if (uart_index >= 100) uart_index = 0;
+//	}
+//	HAL_UART_Receive_IT(&huart1, &uart_data, 1);
+
+
 }
+
+
+
 /* USER CODE END FD_LOCAL_FUNCTIONS*/

@@ -42,6 +42,7 @@
 #include "LTC4162.h"
 #include "ASTI_RTC.h"
 #include "Water_Senix.h"
+#include "Airmar.h"
 
 /* USER CODE END Includes */
 
@@ -107,8 +108,9 @@ uint8_t longpress_duration;
 
 // Water Level Variables
 Senix_t senix;
-uint8_t UART1_txBuffer[10];
-uint8_t UART1_rxBuffer[20];
+
+// Airmar Variable
+Airmar_t airmar;
 
 
 // STS40 Variables
@@ -194,7 +196,6 @@ int main(void)
   /* USER CODE BEGIN 2 */
   sts40_TXCODE =  0xFD;
 
-  HAL_Delay(3000);
 
 	PrintPC("\r\n\r\nInitiate RTC");
   RTC_Init();
@@ -204,9 +205,7 @@ int main(void)
   PrintPC("\r\n\r\nInitiate LTC Device");
   LTC_Init();
 
-  // Senix
-  AssignCommandCode();
-	HAL_UART_Receive_IT(&huart1, senix.rxBuffer, 19);
+  ISCC_GPIO_Init();
 
   /* USER CODE END 2 */
 
@@ -538,7 +537,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 9600;
+  huart1.Init.BaudRate = 4800;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -759,7 +758,6 @@ void PrintPC(char *szFormat, ...){
 		BusyFlag = FREE_FLAG;
   }
 }
-
 
 
 /* USER CODE END 4 */
