@@ -48,11 +48,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-typedef enum
-{
-	Initialize 		= 0,
-	Main_Program	= 1
-}Boot_State;
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -72,17 +68,22 @@ IPCC_HandleTypeDef hipcc;
 
 RTC_HandleTypeDef hrtc;
 
+TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 
+// Custom Device Declarations
+LTC4162 	ltc;
+Senix_t 	senix;
+Airmar_t 	airmar;
+
 // Global Variable
 char system_Message[128];
 
-// LTC4162 Variables
-LTC4162 ltc;
+
 
 // PrintPC Variables
 uint8_t BusyFlag = FREE_FLAG;
@@ -106,22 +107,11 @@ uint8_t switch_Counter;
 uint8_t longpress_duration;
 /* End - Switch variables */
 
-// Water Level Variables
-Senix_t senix;
-
-// Airmar Variable
-Airmar_t airmar;
-
 
 // STS40 Variables
 uint8_t	STS40_RXBuffer[3];     // RX buffer for I2C
 uint8_t	sts40_TXCODE; 	// measure T with highest precision
 volatile float Temp_C;
-
-
-/*char my_uart_buffer[256];
-int my_uart_buffer_index = 0;*/
-/* END - UART variables */
 
 /* USER CODE END PV */
 
@@ -130,18 +120,15 @@ void SystemClock_Config(void);
 void PeriphCommonClock_Config(void);
 static void MX_RF_Init(void);
 static void MX_GPIO_Init(void);
-static void MX_I2C1_Init(void);
 static void MX_RTC_Init(void);
 static void MX_IPCC_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_TIM1_Init(void);
+static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 static void ISCC_GPIO_Init(void);
-//static void ADC_Init(void);
 
-/*void uart1_handler(void);
-void uart1_idleHandler(void);*/
-//static uint32_t GetPage(uint32_t Addr);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -188,12 +175,14 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_RF_Init();
   MX_GPIO_Init();
-  MX_I2C1_Init();
   MX_RTC_Init();
   MX_USB_Device_Init();
   MX_TIM2_Init();
   MX_USART1_UART_Init();
+  MX_TIM1_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
+
   sts40_TXCODE =  0xFD;
 
 
@@ -205,7 +194,7 @@ int main(void)
   PrintPC("\r\n\r\nInitiate LTC Device");
   LTC_Init();
 
-  ISCC_GPIO_Init();
+//  ISCC_GPIO_Init();
 
   /* USER CODE END 2 */
 
@@ -477,6 +466,53 @@ static void MX_RTC_Init(void)
 }
 
 /**
+  * @brief TIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM1_Init(void)
+{
+
+  /* USER CODE BEGIN TIM1_Init 0 */
+
+  /* USER CODE END TIM1_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM1_Init 1 */
+
+  /* USER CODE END TIM1_Init 1 */
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 32000-1;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 50-1;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterOutputTrigger2 = TIM_TRGO2_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM1_Init 2 */
+
+  /* USER CODE END TIM1_Init 2 */
+
+}
+
+/**
   * @brief TIM2 Initialization Function
   * @param None
   * @retval None
@@ -675,24 +711,24 @@ static void ISCC_GPIO_Init(void)
 
 
 void GetSTS40TempC(void){
-	uint16_t rawTemp;
-	HAL_StatusTypeDef status;
-
-	status = HAL_I2C_IsDeviceReady(&hi2c1, STS40_I2C_ADDR, 3, HAL_MAX_DELAY);
-
-	if(status == HAL_OK){
-	  status = HAL_I2C_Master_Transmit(&hi2c1, STS40_I2C_ADDR, &sts40_TXCODE, 1, HAL_MAX_DELAY);
-	  HAL_Delay(100);
-
-	  if(status != HAL_OK) Error_Handler();
-	  status = HAL_I2C_Master_Receive(&hi2c1, STS40_I2C_ADDR, (uint8_t*)STS40_RXBuffer, 2, HAL_MAX_DELAY);
-
-	  if(status != HAL_OK) Error_Handler();
-	}
-	else Error_Handler();
-
-	rawTemp = (STS40_RXBuffer[0] << 8) | STS40_RXBuffer[1];
-	Temp_C = ((rawTemp/65535.0f) * 175.0f) - 45.0f;
+//	uint16_t rawTemp;
+//	HAL_StatusTypeDef status;
+//
+//	status = HAL_I2C_IsDeviceReady(&hi2c1, STS40_I2C_ADDR, 3, HAL_MAX_DELAY);
+//
+//	if(status == HAL_OK){
+//	  status = HAL_I2C_Master_Transmit(&hi2c1, STS40_I2C_ADDR, &sts40_TXCODE, 1, HAL_MAX_DELAY);
+//	  HAL_Delay(100);
+//
+//	  if(status != HAL_OK) Error_Handler();
+//	  status = HAL_I2C_Master_Receive(&hi2c1, STS40_I2C_ADDR, (uint8_t*)STS40_RXBuffer, 2, HAL_MAX_DELAY);
+//
+//	  if(status != HAL_OK) Error_Handler();
+//	}
+//	else Error_Handler();
+//
+//	rawTemp = (STS40_RXBuffer[0] << 8) | STS40_RXBuffer[1];
+//	Temp_C = ((rawTemp/65535.0f) * 175.0f) - 45.0f;
 }
 
 void PrintPC(char *szFormat, ...){

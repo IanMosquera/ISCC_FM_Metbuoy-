@@ -54,7 +54,7 @@ extern "C" {
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
-#define AVE(__x__)		((__x__[0] + __x__[1])/2)
+
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/

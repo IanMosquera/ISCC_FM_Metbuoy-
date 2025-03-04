@@ -79,11 +79,14 @@ uint16_t Connection_Handle;
 /* USER CODE BEGIN PV */
 
 extern I2C_HandleTypeDef hi2c1;
+extern RTC_HandleTypeDef hrtc;
+extern TIM_HandleTypeDef htim1;
 extern TIM_HandleTypeDef htim2;
 
+extern UART_HandleTypeDef huart1;
+
+
 extern LTC4162 ltc;
-
-
 
 static char	a_SzString[70];		/*buffer for everything else*/
 uint8_t txbuff[70];
@@ -99,7 +102,7 @@ extern uint8_t	sts40_TXCODE; 	// measure T with highest precision
 extern volatile float Temp_C;
 
 // RTC Variables
-extern RTC_HandleTypeDef hrtc;
+
 uint8_t aShowTime[16] = "hh:ms:ss";
 uint8_t aShowDateTime[20] = "YY/MM/DD,hh:ms:ss";
 uint8_t rtcTime[12]	=	 "12:03:00";
@@ -111,7 +114,7 @@ RTC_DateTypeDef sDate;
 extern Senix_t senix;
 extern Airmar_t airmar;
 
-extern UART_HandleTypeDef huart1;
+
 uint8_t uart_buff[100];
 uint8_t uart_data;
 uint8_t uart_index = 0;
@@ -243,8 +246,8 @@ void Custom_APP_Init(void)
 	sprintf(a_SzString, "BLE Transmit Test\r\n");
 
 	// Start Timer for Reading Charging Data
+	HAL_TIM_Base_Start_IT(&htim1);
 	HAL_TIM_Base_Start_IT(&htim2);
-
 
 	// Start Uart Interrupt
 
@@ -254,6 +257,9 @@ void Custom_APP_Init(void)
 
 #elif UART_Airmar
 	airmar.charIndex = 0;
+	airmar.NMEAPrio = 1;
+	airmar.dataFilled = 0b00000000; //No fill data yet
+
 	HAL_UART_Receive_IT(&huart1, &airmar.rxChar, 1);
 #endif
 
@@ -265,7 +271,8 @@ void Custom_APP_Init(void)
 }
 
 /* USER CODE BEGIN FD */
-void ReadChargingData(void){
+void ReadChargingData(void)
+{
 	RTC_ReadDate(rtcDate);
 	RTC_ReadTime(rtcTime);
 
@@ -300,7 +307,8 @@ void ReadChargingData(void){
 	PrintPC("%s", system_Message);
 }
 
-void ReadTempData(void){
+void ReadTempData(void)
+{
 	LTC4162_ReadDieTemp(&ltc);
 	LTC4162_ReadNTC(&ltc);
 	GetSTS40TempC();
@@ -379,23 +387,19 @@ void ReadOutCurrent(void){
 
 		ltc.iOUT = ltc.iBAT;
 	}
-
-
 }
 
 
 void GetDistance(void){
 
-	uint8_t m[10];
-	sprintf((char *)m,"test\r\n");
-	HAL_UART_Transmit(&huart1, m, 6, HAL_MAX_DELAY);
-
 	//	SensorPollSenix();
 	//SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&senix.strBuffer[0]);
+	HAL_GPIO_TogglePin(STAT_GPIO_Port, STAT_Pin);
 
 }
 
-void FilterCommands(uint8_t * pPayload, uint8_t Length){
+void FilterCommands(uint8_t * pPayload, uint8_t Length)
+{
 	uint8_t address, buf[2];
 	uint8_t str[64];
 	uint16_t val;
@@ -429,7 +433,8 @@ void FilterCommands(uint8_t * pPayload, uint8_t Length){
 		}
 	}
 	// For RTC
-	else if((pPayload[0]=='R') & (pPayload[1]=='T') & (pPayload[2]=='C')){
+	else if((pPayload[0]=='R') & (pPayload[1]=='T') & (pPayload[2]=='C'))
+	{
 		if ((pPayload[3]=='R') & (pPayload[4]=='T')){
 			// ReadRTCTime
 			RTC_ReadTime(aShowTime);
@@ -487,6 +492,14 @@ void FilterCommands(uint8_t * pPayload, uint8_t Length){
 
 			RTC_WriteDateTime(&sTime, &sDate);
 		}
+	}
+	else if((pPayload[0]=='E') & (pPayload[1]=='N') & (pPayload[2]=='U'))
+	{
+		HAL_UART_Receive_IT(&huart1, &airmar.rxChar, 1);
+	}
+	else if((pPayload[0]=='D') & (pPayload[1]=='S') & (pPayload[2]=='U'))
+	{
+		HAL_UART_Abort_IT(&huart1);
 	}
 }
 
@@ -579,15 +592,24 @@ void SPP_Transmit(void){
  *  @retval 	None
  */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-	if (htim == &htim2){
-//		UTIL_SEQ_SetTask(1 << CFG_TASK_READCHGDATA, CFG_SCH_PRIO_0);
+	if (htim == &htim1)
+	{
+		//getNMEAIdentifier();
+		ExtractDatafromSentence();
+	}
+
+	else if (htim == &htim2)
+	{
+		UTIL_SEQ_SetTask(1 << CFG_TASK_READCHGDATA, CFG_SCH_PRIO_0);
 //		UTIL_SEQ_SetTask(1 << CFG_TASK_READCFBTREG, CFG_SCH_PRIO_0);
 //		UTIL_SEQ_SetTask(1 << CFG_TASK_READSYSSTREG, CFG_SCH_PRIO_0);
 //		UTIL_SEQ_SetTask(1 << CFG_TASK_READTEMPDATA, CFG_SCH_PRIO_0);
-		UTIL_SEQ_SetTask(1 << CFG_TASK_READSENSOR, CFG_SCH_PRIO_0);
+//		UTIL_SEQ_SetTask(1 << CFG_TASK_READSENSOR, CFG_SCH_PRIO_0);
 
+		GetDataFromAirmar(WIMDA);
 		HAL_GPIO_TogglePin(STAT_GPIO_Port, STAT_Pin);
 	}
+
 }
 
 
@@ -600,23 +622,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 	HAL_UART_Receive_IT(&huart1, senix.rxBuffer, 19);
 
 #elif UART_Airmar
-
-	GetDataChar();
+	// GetDataChar();
+	GetDataString();
 	HAL_UART_Receive_IT(&huart1, &airmar.rxChar, 1);
-
-//	GetDataChar();
 #endif
-
-
-//	if (uart_data == '\r'){
-//		uart_buff[uart_index] = '\0';
-//	}
-//	else{
-//		uart_buff[uart_index++] = uart_data;
-//		if (uart_index >= 100) uart_index = 0;
-//	}
-//	HAL_UART_Receive_IT(&huart1, &uart_data, 1);
-
 
 }
 
