@@ -45,11 +45,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-typedef enum
-{
-	Initialize 		= 0,
-	Main_Program	= 1
-}Boot_State;
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -63,6 +59,8 @@ typedef enum
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+
 I2C_HandleTypeDef hi2c1;
 
 IPCC_HandleTypeDef hipcc;
@@ -81,22 +79,6 @@ LTC4162 ltc;
 // PrintPC Variables
 uint8_t BusyFlag = FREE_FLAG;
 static char str[133], strDisplay[133];
-
-
-/* START - FLASH Program variables */
-//char 		DataString[60][85];
-//char 		TempData[70] = "14.11,0.9659,14.08,13.11,00.8331,46.00,0512,0008,0.127,29.42";
-//char 		LineBuff[12][8];
-
-//uint8_t txbuff[70];
-//uint8_t i, idx, c, x;
-
-//uint32_t FirstPage = 0, NbOfPages = 0;
-//uint32_t Address = 0, PageError = 0;
-
-//static FLASH_EraseInitTypeDef EraseInitStruct;
-/* END - FLASH Program variables */
-
 
 /* START - ADC variables */
 extern uint16_t	buf_avg[2];
@@ -141,6 +123,7 @@ static void MX_TIM2_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_ADC1_Init(void);
 static void MX_RF_Init(void);
 /* USER CODE BEGIN PFP */
 static void ISCC_GPIO_Init(void);
@@ -200,6 +183,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_TIM1_Init();
   MX_I2C1_Init();
+  MX_ADC1_Init();
   MX_RF_Init();
   /* USER CODE BEGIN 2 */
   sts40_TXCODE =  0xFD;
@@ -214,11 +198,11 @@ int main(void)
   PrintPC("\r\n\r\nInitiate LTC Device");
   LTC_Init(&ltc);
 
-//  ADC_Init();
-//  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buff, 32);
+  //ADC_Init();
+  //HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buff, 32);
 
 
-//  ISCC_GPIO_Init();
+  ISCC_GPIO_Init();
 
 
   /* USER CODE END 2 */
@@ -251,6 +235,14 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+
+  /** Macro to configure the PLL multiplication factor
+  */
+  __HAL_RCC_PLL_PLLM_CONFIG(RCC_PLLM_DIV2);
+
+  /** Macro to configure the PLL clock source
+  */
+  __HAL_RCC_PLL_PLLSOURCE_CONFIG(RCC_PLLSOURCE_HSE);
 
   /** Configure the main internal regulator output voltage
   */
@@ -312,6 +304,64 @@ void PeriphCommonClock_Config(void)
   /* USER CODE BEGIN Smps */
   LL_HSEM_1StepLock( HSEM, 5);
   /* USER CODE END Smps */
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Common config
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  hadc1.Init.LowPowerAutoWait = DISABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
+  hadc1.Init.OversamplingMode = DISABLE;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_8;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_2CYCLES_5;
+  sConfig.SingleDiff = ADC_SINGLE_ENDED;
+  sConfig.OffsetNumber = ADC_OFFSET_NONE;
+  sConfig.Offset = 0;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
 }
 
 /**
@@ -549,7 +599,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 32000-1;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 5000-1;
+  htim2.Init.Period = 2000-1;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -642,7 +692,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOA, STAT_Pin|CE5V_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(ENUVLO_GPIO_Port, ENUVLO_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(DS_EFUSE_GPIO_Port, DS_EFUSE_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pins : STAT_Pin CE5V_Pin */
   GPIO_InitStruct.Pin = STAT_Pin|CE5V_Pin;
@@ -651,12 +701,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : ENUVLO_Pin */
-  GPIO_InitStruct.Pin = ENUVLO_Pin;
+  /*Configure GPIO pin : DS_EFUSE_Pin */
+  GPIO_InitStruct.Pin = DS_EFUSE_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(ENUVLO_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(DS_EFUSE_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : SW_OFF_Pin */
   GPIO_InitStruct.Pin = SW_OFF_Pin;
@@ -705,9 +755,10 @@ static void MX_GPIO_Init(void)
 
 static void ISCC_GPIO_Init(void)
 {
-	HAL_GPIO_WritePin(CE5V_GPIO_Port, CE5V_Pin, GPIO_PIN_SET);				/**< Enable 5V output of TS300 5V Converter */
-	HAL_GPIO_WritePin(ENUVLO_GPIO_Port, ENUVLO_Pin, GPIO_PIN_RESET);	/**< Enable E-FUSE ENUVLO pin*/
-//	HAL_GPIO_WritePin(SW1_GPIO_Port, SW1_Pin, GPIO_PIN_RESET); 				/**< TurnOff Load by default*/
+	HAL_GPIO_WritePin(DS_EFUSE_GPIO_Port, DS_EFUSE_Pin, GPIO_PIN_RESET);
+	//HAL_GPIO_WritePin(CE5V_GPIO_Port, CE5V_Pin, GPIO_PIN_RESET);			/**< Enable 5V output of TS300 5V Converter */
+
+//	HAL_GPIO_WritePin(SW1_GPIO_Port, SW1_Pin, GPIO_PIN_RESET); 			/**< TurnOff Load by default*/
 //	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
 }

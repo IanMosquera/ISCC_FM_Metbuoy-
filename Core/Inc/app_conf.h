@@ -679,6 +679,7 @@ typedef enum
 	CFG_TASK_READTEMPDATA,
 	CFG_TASK_READCFBTREG,
 	CFG_TASK_READSYSSTREG,
+	CFG_TASK_SEND_STR,
   /* USER CODE END CFG_Task_Id_With_HCI_Cmd_t */
   CFG_LAST_TASK_ID_WITH_HCICMD,                                               /**< Shall be LAST in the list */
 } CFG_Task_Id_With_HCI_Cmd_t;

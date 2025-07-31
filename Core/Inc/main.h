@@ -68,10 +68,12 @@ void PrintPC(char *szFormat, ...);
 /* Private defines -----------------------------------------------------------*/
 #define STAT_Pin GPIO_PIN_0
 #define STAT_GPIO_Port GPIOA
+#define GIMON_Pin GPIO_PIN_3
+#define GIMON_GPIO_Port GPIOA
 #define CE5V_Pin GPIO_PIN_4
 #define CE5V_GPIO_Port GPIOA
-#define ENUVLO_Pin GPIO_PIN_1
-#define ENUVLO_GPIO_Port GPIOB
+#define DS_EFUSE_Pin GPIO_PIN_1
+#define DS_EFUSE_GPIO_Port GPIOB
 #define SW_OFF_Pin GPIO_PIN_4
 #define SW_OFF_GPIO_Port GPIOE
 #define SW_OFF_EXTI_IRQn EXTI4_IRQn

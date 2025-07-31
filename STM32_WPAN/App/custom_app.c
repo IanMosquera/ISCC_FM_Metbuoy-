@@ -104,6 +104,10 @@ uint8_t rtcDate[14]	=	 "24-02-01";
 RTC_TimeTypeDef sTime;
 RTC_DateTypeDef sDate;
 
+uint8_t ReadDataTimer;
+
+uint16_t Prog_Ctr;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -121,6 +125,9 @@ void ReadOutCurrent(void);
 void FilterCommands(uint8_t * pPayload, uint8_t Length);
 void ReadRTCTime(void);
 void ReadRTCDate(void);
+
+bool TimeToReadData(void);
+void CountProgramCounter(void);
 
 /* USER CODE END PFP */
 
@@ -221,14 +228,17 @@ void Custom_APP_Init(void)
 {
   /* USER CODE BEGIN CUSTOM_APP_Init */
 
-	UTIL_SEQ_RegTask(1 << CFG_TASK_READCHGDATA, UTIL_SEQ_RFU, ReadChargingData);
+	UTIL_SEQ_RegTask(1 << CFG_TASK_READCHGDATA,  UTIL_SEQ_RFU, ReadChargingData);
 	UTIL_SEQ_RegTask(1 << CFG_TASK_READTEMPDATA, UTIL_SEQ_RFU, ReadTempData);
-	UTIL_SEQ_RegTask(1 << CFG_TASK_READCFBTREG, UTIL_SEQ_RFU, ReadConfigBitsRegister);
+	UTIL_SEQ_RegTask(1 << CFG_TASK_READCFBTREG,  UTIL_SEQ_RFU, ReadConfigBitsRegister);
 	UTIL_SEQ_RegTask(1 << CFG_TASK_READSYSSTREG, UTIL_SEQ_RFU, ReadSystemStatusRegister);
+	UTIL_SEQ_RegTask(1 << CFG_TASK_SEND_STR, 		UTIL_SEQ_RFU, SPP_Transmit);
+
 
 	sprintf(a_SzString, "BLE Transmit Test\r\n");
 
 	// Start Timer for Reading Charging Data
+	Prog_Ctr = 0;
 	HAL_TIM_Base_Start_IT(&htim2);
 
   /* USER CODE END CUSTOM_APP_Init */
@@ -236,9 +246,22 @@ void Custom_APP_Init(void)
 }
 
 /* USER CODE BEGIN FD */
+
+void CountProgramCounter(void)
+{
+	if (Prog_Ctr >= 299) //15 min
+	{
+		Prog_Ctr = 0;
+	}
+	else
+	{
+		Prog_Ctr++;
+	}
+}
+
 void ReadChargingData(void){
-	RTC_ReadDate(rtcDate);
-	RTC_ReadTime(rtcTime);
+	//RTC_ReadDate(rtcDate);
+	//RTC_ReadTime(rtcTime);
 
 	LTC4162_ReadIIN(&ltc);
 	LTC4162_ReadIBAT(&ltc);
@@ -532,18 +555,30 @@ void SPP_Transmit(void){
   SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&a_SzString[0]);
 }
 
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  if (GPIO_Pin == SW_OFF_Pin)
+  {
+  	sprintf(a_SzString, "SW_OFF button pressed\r\n");
+		UTIL_SEQ_SetTask(1 << CFG_TASK_SEND_STR, CFG_SCH_PRIO_0);
+  }
+}
+
 /**
  *  @brief	Timer interrupt function for performing registered tasks
  *  @param	*htim	Timer handler
  *  @retval 	None
  */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-	if (htim == &htim2){
+	if (htim == &htim2)
+	{
+		CountProgramCounter();
+
 		UTIL_SEQ_SetTask(1 << CFG_TASK_READCHGDATA, CFG_SCH_PRIO_0);
 		UTIL_SEQ_SetTask(1 << CFG_TASK_READCFBTREG, CFG_SCH_PRIO_0);
 		UTIL_SEQ_SetTask(1 << CFG_TASK_READSYSSTREG, CFG_SCH_PRIO_0);
-		// UTIL_SEQ_SetTask(1 << CFG_TASK_READTEMPDATA, CFG_SCH_PRIO_0);
-
+		UTIL_SEQ_SetTask(1 << CFG_TASK_READTEMPDATA, CFG_SCH_PRIO_0);
 		HAL_GPIO_TogglePin(STAT_GPIO_Port, STAT_Pin);
 	}
 }
