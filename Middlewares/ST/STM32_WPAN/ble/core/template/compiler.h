@@ -5,7 +5,7 @@
  *****************************************************************************
  * @attention
  *
- * Copyright (c) 2018-2024 STMicroelectronics.
+ * Copyright (c) 2018-2025 STMicroelectronics.
  * All rights reserved.
  *
  * This software is licensed under terms that can be found in the LICENSE file
@@ -112,7 +112,7 @@
  * @brief  This is the section dedicated to Keil toolchain
  */
 #else
-#ifdef __CC_ARM	
+#ifdef __CC_ARM
 
 #ifndef __WEAK
 #define __WEAK __weak

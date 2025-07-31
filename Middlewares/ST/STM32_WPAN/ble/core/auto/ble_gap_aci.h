@@ -1,11 +1,11 @@
 /*****************************************************************************
  * @file    ble_gap_aci.h
- * @brief   STM32WB BLE API (gap_aci)
+ * @brief   STM32WB BLE API (GAP_ACI)
  *          Auto-generated file: do not edit!
  *****************************************************************************
  * @attention
  *
- * Copyright (c) 2018-2024 STMicroelectronics.
+ * Copyright (c) 2018-2025 STMicroelectronics.
  * All rights reserved.
  *
  * This software is licensed under terms that can be found in the LICENSE file
@@ -19,13 +19,13 @@
 #define BLE_GAP_ACI_H__
 
 
-#include "ble_types.h"
+#include "auto/ble_types.h"
 
 /**
  * @brief ACI_GAP_SET_NON_DISCOVERABLE
- * Puts the device in non-discoverable mode. This command disables the LL
- * advertising.
- * Note: this command only supports legacy advertising.
+ * This command stops advertising.
+ * Note: this command only supports legacy advertising. For extended
+ * advertising, refer to ACI_GAP_ADV_SET_ENABLE.
  * 
  * @return Value indicating success or error code.
  */
@@ -33,10 +33,11 @@ tBleStatus aci_gap_set_non_discoverable( void );
 
 /**
  * @brief ACI_GAP_SET_LIMITED_DISCOVERABLE
- * Puts the device in limited discoverable mode (as defined in Bluetooth spec.
- * [Vol 3, Part C, 9.2.3]). The device will be discoverable for maximum period
- * of TGAP (lim_adv_timeout) = 180 seconds (from errata). The advertising can
- * be disabled at any time by issuing ACI_GAP_SET_NON_DISCOVERABLE command.
+ * Puts the device in limited discoverable mode (as defined in Core
+ * Specification [Vol 3, Part C, 9.2.3]). The device will be discoverable for
+ * maximum period of TGAP (lim_adv_timeout) = 180 seconds (from errata). The
+ * advertising can be disabled at any time by issuing
+ * ACI_GAP_SET_NON_DISCOVERABLE command.
  * The Adv_Interval_Min and Adv_Interval_Max parameters are optional. If both
  * are set to 0, the GAP will use default values for adv intervals for limited
  * discoverable mode (250 ms and 500 ms respectively).
@@ -52,7 +53,9 @@ tBleStatus aci_gap_set_non_discoverable( void );
  * - Power Level
  * When advertising timeout happens (i.e. limited discovery period has
  * elapsed), controller generates ACI_GAP_LIMITED_DISCOVERABLE_EVENT event.
- * Note: this command only supports legacy advertising.
+ * Note: this command only supports legacy advertising For extended
+ * advertising, refer to ACI_GAP_ADV_SET_CONFIGURATION and
+ * ACI_GAP_ADV_SET_ENABLE..
  * 
  * @param Advertising_Type Advertising type
  *        Values:
@@ -125,11 +128,12 @@ tBleStatus aci_gap_set_limited_discoverable( uint8_t Advertising_Type,
 
 /**
  * @brief ACI_GAP_SET_DISCOVERABLE
- * Puts the device in general discoverable mode (as defined in Bluetooth spec.
- * [Vol 3, Part C, 9.2.4]). The device will be discoverable until the host
- * issues the ACI_GAP_SET_NON_DISCOVERABLE command. The Adv_Interval_Min and
- * Adv_Interval_Max parameters are optional. If both are set to 0, the GAP uses
- * the default values for adv intervals for general discoverable mode.
+ * Puts the device in general discoverable mode (as defined in Core
+ * Specification [Vol 3, Part C, 9.2.4]). The device will be discoverable until
+ * the host issues the ACI_GAP_SET_NON_DISCOVERABLE command. The
+ * Adv_Interval_Min and Adv_Interval_Max parameters are optional. If both are
+ * set to 0, the GAP uses the default values for adv intervals for general
+ * discoverable mode.
  * When using connectable undirected advertising events:
  * - Adv_Interval_Min = 30 ms
  * - Adv_Interval_Max = 60 ms
@@ -148,7 +152,9 @@ tBleStatus aci_gap_set_limited_discoverable( uint8_t Advertising_Type,
  * standard AD types:
  * - AD Flags
  * - TX Power Level
- * Note: this command only supports legacy advertising.
+ * Note: this command only supports legacy advertising. For extended
+ * advertising, refer to ACI_GAP_ADV_SET_CONFIGURATION and
+ * ACI_GAP_ADV_SET_ENABLE.
  * 
  * @param Advertising_Type Advertising type
  *        Values:
@@ -221,10 +227,10 @@ tBleStatus aci_gap_set_discoverable( uint8_t Advertising_Type,
 
 /**
  * @brief ACI_GAP_SET_DIRECT_CONNECTABLE
- * Sets the device in directed connectable mode (as defined in Bluetooth spec.
- * [Vol 3, Part C, 9.3.3]). In this mode, the device advertises using high duty
- * cycle connectable directed advertising events or low duty cycle connectable
- * directed advertising events.
+ * Sets the device in directed connectable mode (as defined in Core
+ * Specification [Vol 3, Part C, 9.3.3]). In this mode, the device advertises
+ * using high duty cycle connectable directed advertising events or low duty
+ * cycle connectable directed advertising events.
  * The device's own address used in advertising packets is defined by the
  * Own_Address_Type parameter depending on whether privacy is enabled or not.
  * When using high duty cycle connectable directed advertising events, the
@@ -235,7 +241,9 @@ tBleStatus aci_gap_set_discoverable( uint8_t Advertising_Type,
  * status set to HCI_ADVERTISING_TIMEOUT_ERR_CODE if the connection was not
  * established and BLE_STATUS_SUCCESS (0x00) if the connection was successfully
  * established.
- * Note: this command only supports legacy advertising.
+ * Note: this command only supports legacy advertising. For extended
+ * advertising, refer to ACI_GAP_ADV_SET_CONFIGURATION and
+ * ACI_GAP_ADV_SET_ENABLE.
  * 
  * @param Own_Address_Type Own address type: if Privacy is disabled, the
  *        address can be public or static random; otherwise, it can be a
@@ -316,9 +324,9 @@ tBleStatus aci_gap_set_io_capability( uint8_t IO_Capability );
  *        - 0x00: Keypress notification not supported
  *        - 0x01: Keypress notification supported
  * @param Min_Encryption_Key_Size Minimum encryption key size to be used during
- *        pairing
+ *        pairing.
  * @param Max_Encryption_Key_Size Maximum encryption key size to be used during
- *        pairing
+ *        pairing.
  * @param Use_Fixed_Pin Use or not fixed pin. If set to 0x00, then during the
  *        pairing process the application will not be requested for a pin
  *        (Fixed_Pin will be used).
@@ -445,10 +453,13 @@ tBleStatus aci_gap_init( uint8_t Role,
 
 /**
  * @brief ACI_GAP_SET_NON_CONNECTABLE
- * Puts the device into non connectable mode. This mode does not support
- * connection. The privacy setting done in the ACI_GAP_INIT command plays a
- * role in deciding the valid parameters for this command.
- * Advertiser filter policy is internally set to 0.
+ * This command starts advertising in non connectable mode (i.e., this mode
+ * does not support connection).
+ * Advertiser filter policy is internally set to 0 (i.e., the Filter Accept
+ * List is not in use).
+ * Note: this command only supports legacy advertising. For extended
+ * advertising, refer to ACI_GAP_ADV_SET_CONFIGURATION and
+ * ACI_GAP_ADV_SET_ENABLE.
  * 
  * @param Advertising_Event_Type Advertising type
  *        Values:
@@ -469,11 +480,13 @@ tBleStatus aci_gap_set_non_connectable( uint8_t Advertising_Event_Type,
 
 /**
  * @brief ACI_GAP_SET_UNDIRECTED_CONNECTABLE
- * Puts the device into undirected connectable mode.
+ * This command starts advertising in undirected connectable mode.
  * If privacy is enabled in the device, a resolvable private address is
  * generated and used as the advertiser's address. If not, the address of the
  * type specified in Own_Address_Type is used for advertising.
- * Note: this command only supports legacy advertising.
+ * Note: this command only supports legacy advertising. For extended
+ * advertising, refer to ACI_GAP_ADV_SET_CONFIGURATION and
+ * ACI_GAP_ADV_SET_ENABLE.
  * 
  * @param Advertising_Interval_Min Minimum advertising interval.
  *        Time = N * 0.625 ms.
@@ -518,11 +531,16 @@ tBleStatus aci_gap_peripheral_security_req( uint16_t Connection_Handle );
 
 /**
  * @brief ACI_GAP_UPDATE_ADV_DATA
- * This command can be used to update the advertising data for a particular AD
- * type. If the AD type specified does not exist, then it is added to the
- * advertising data. If the overall advertising data length is more than 31
+ * This command can be used to update the advertising data for particular AD
+ * types. The data argument shall consist of valid advertising data composed of
+ * one or more AD types. If one of the specified AD types does not exist in the
+ * current advertising data, then it is added to the advertising data; while
+ * the AD types already present in the current advertising data are updated
+ * with the new values. If the overall advertising data length is more than 31
  * octets after the update, then the command is rejected and the old data is
  * retained.
+ * Note: this command only supports legacy advertising. For extended
+ * advertising, refer to ACI_GAP_ADV_SET_ADV_DATA.
  * 
  * @param AdvDataLen Length of AdvData in octets
  * @param AdvData Advertising data used by the device while advertising.
@@ -535,8 +553,11 @@ tBleStatus aci_gap_update_adv_data( uint8_t AdvDataLen,
  * @brief ACI_GAP_DELETE_AD_TYPE
  * This command can be used to delete the specified AD type from the
  * advertisement data if present.
+ * Note: this command only supports legacy advertising. For extended
+ * advertising, refer to ACI_GAP_ADV_SET_ADV_DATA.
  * 
- * @param ADType One of the AD types as in Bluetooth spec. [Vol 3, Part C, 11].
+ * @param ADType One of the AD types as in Core Specification [Vol 3, Part C,
+ *        11].
  * @return Value indicating success or error code.
  */
 tBleStatus aci_gap_delete_ad_type( uint8_t ADType );
@@ -567,16 +588,14 @@ tBleStatus aci_gap_get_security_level( uint16_t Connection_Handle,
  * @brief ACI_GAP_SET_EVENT_MASK
  * It allows masking events from the GAP. If the bit in the GAP_Evt_Mask is set
  * to a one, then the event associated with that bit will be enabled.
- * The default configuration is all the events masked.
  * 
- * @param GAP_Evt_Mask GAP event mask. Default: 0xFFFF.
+ * @param GAP_Evt_Mask ACI GAP/L2CAP event mask. Default: 0xFFFF.
  *        Flags:
  *        - 0x0000: No events
  *        - 0x0001: ACI_GAP_LIMITED_DISCOVERABLE_EVENT
  *        - 0x0002: ACI_GAP_PAIRING_COMPLETE_EVENT
  *        - 0x0004: ACI_GAP_PASS_KEY_REQ_EVENT
  *        - 0x0008: ACI_GAP_AUTHORIZATION_REQ_EVENT
- *        - 0x0010: ACI_GAP_PERIPHERAL_SECURITY_INITIATED_EVENT
  *        - 0x0020: ACI_GAP_BOND_LOST_EVENT
  *        - 0x0080: ACI_GAP_PROC_COMPLETE_EVENT
  *        - 0x0100: ACI_L2CAP_CONNECTION_UPDATE_REQ_EVENT
@@ -714,20 +733,12 @@ tBleStatus aci_gap_start_limited_discovery_proc( uint16_t LE_Scan_Interval,
  *        scan.
  *        Time = N * 0.625 ms.
  *        Values:
- *        - 0x0004 (2.500 ms)  ... 0x4000 (10240.000 ms) : legacy advertising
- *        - 0x0004 (2.500 ms)  ... 0x5DC0 (15000.000 ms) : extended advertising
- *          with STM32WB
- *        - 0x0004 (2.500 ms)  ... 0xFFFF (40959.375 ms) : extended advertising
- *          with STM32WBA
+ *        - 0x0004 (2.500 ms)  ... 0x4000 (10240.000 ms)
  * @param LE_Scan_Window Amount of time for the duration of the LE scan.
  *        LE_Scan_Window shall be less than or equal to LE_Scan_Interval.
  *        Time = N * 0.625 ms.
  *        Values:
- *        - 0x0004 (2.500 ms)  ... 0x4000 (10240.000 ms) : legacy advertising
- *        - 0x0004 (2.500 ms)  ... 0x5DC0 (15000.000 ms) : extended advertising
- *          with STM32WB
- *        - 0x0004 (2.500 ms)  ... 0xFFFF (40959.375 ms) : extended advertising
- *          with STM32WBA
+ *        - 0x0004 (2.500 ms)  ... 0x4000 (10240.000 ms)
  * @param Own_Address_Type Own address type: if Privacy is disabled, the
  *        address can be public or static random; otherwise, it can be a
  *        resolvable private address or a non-resolvable private address.
@@ -772,18 +783,12 @@ tBleStatus aci_gap_start_general_discovery_proc( uint16_t LE_Scan_Interval,
  *        Values:
  *        - 0x0004 (2.500 ms)  ... 0x4000 (10240.000 ms) : legacy advertising
  *        - 0x0004 (2.500 ms)  ... 0x5DC0 (15000.000 ms) : extended advertising
- *          with STM32WB
- *        - 0x0004 (2.500 ms)  ... 0xFFFF (40959.375 ms) : extended advertising
- *          with STM32WBA
  * @param LE_Scan_Window Amount of time for the duration of the LE scan.
  *        LE_Scan_Window shall be less than or equal to LE_Scan_Interval.
  *        Time = N * 0.625 ms.
  *        Values:
  *        - 0x0004 (2.500 ms)  ... 0x4000 (10240.000 ms) : legacy advertising
  *        - 0x0004 (2.500 ms)  ... 0x5DC0 (15000.000 ms) : extended advertising
- *          with STM32WB
- *        - 0x0004 (2.500 ms)  ... 0xFFFF (40959.375 ms) : extended advertising
- *          with STM32WBA
  * @param Own_Address_Type Own address type: if Privacy is disabled, the
  *        address can be public or static random; otherwise, it can be a
  *        resolvable private address.
@@ -875,18 +880,12 @@ tBleStatus aci_gap_start_auto_connection_establish_proc( uint16_t LE_Scan_Interv
  *        Values:
  *        - 0x0004 (2.500 ms)  ... 0x4000 (10240.000 ms) : legacy advertising
  *        - 0x0004 (2.500 ms)  ... 0x5DC0 (15000.000 ms) : extended advertising
- *          with STM32WB
- *        - 0x0004 (2.500 ms)  ... 0xFFFF (40959.375 ms) : extended advertising
- *          with STM32WBA
  * @param LE_Scan_Window Amount of time for the duration of the LE scan.
  *        LE_Scan_Window shall be less than or equal to LE_Scan_Interval.
  *        Time = N * 0.625 ms.
  *        Values:
  *        - 0x0004 (2.500 ms)  ... 0x4000 (10240.000 ms) : legacy advertising
  *        - 0x0004 (2.500 ms)  ... 0x5DC0 (15000.000 ms) : extended advertising
- *          with STM32WB
- *        - 0x0004 (2.500 ms)  ... 0xFFFF (40959.375 ms) : extended advertising
- *          with STM32WBA
  * @param Own_Address_Type Own address type: if Privacy is disabled, the
  *        address can be public or static random; otherwise, it can be a
  *        resolvable private address or a non-resolvable private address.
@@ -960,18 +959,12 @@ tBleStatus aci_gap_start_general_connection_establish_proc( uint8_t LE_Scan_Type
  *        Values:
  *        - 0x0004 (2.500 ms)  ... 0x4000 (10240.000 ms) : legacy advertising
  *        - 0x0004 (2.500 ms)  ... 0x5DC0 (15000.000 ms) : extended advertising
- *          with STM32WB
- *        - 0x0004 (2.500 ms)  ... 0xFFFF (40959.375 ms) : extended advertising
- *          with STM32WBA
  * @param LE_Scan_Window Amount of time for the duration of the LE scan.
  *        LE_Scan_Window shall be less than or equal to LE_Scan_Interval.
  *        Time = N * 0.625 ms.
  *        Values:
  *        - 0x0004 (2.500 ms)  ... 0x4000 (10240.000 ms) : legacy advertising
  *        - 0x0004 (2.500 ms)  ... 0x5DC0 (15000.000 ms) : extended advertising
- *          with STM32WB
- *        - 0x0004 (2.500 ms)  ... 0xFFFF (40959.375 ms) : extended advertising
- *          with STM32WBA
  * @param Own_Address_Type Own address type: if Privacy is disabled, the
  *        address can be public or static random; otherwise, it can be a
  *        resolvable private address or a non-resolvable private address.
@@ -1040,18 +1033,12 @@ tBleStatus aci_gap_start_selective_connection_establish_proc( uint8_t LE_Scan_Ty
  *        Values:
  *        - 0x0004 (2.500 ms)  ... 0x4000 (10240.000 ms) : legacy advertising
  *        - 0x0004 (2.500 ms)  ... 0x5DC0 (15000.000 ms) : extended advertising
- *          with STM32WB
- *        - 0x0004 (2.500 ms)  ... 0xFFFF (40959.375 ms) : extended advertising
- *          with STM32WBA
  * @param LE_Scan_Window Amount of time for the duration of the LE scan.
  *        LE_Scan_Window shall be less than or equal to LE_Scan_Interval.
  *        Time = N * 0.625 ms.
  *        Values:
  *        - 0x0004 (2.500 ms)  ... 0x4000 (10240.000 ms) : legacy advertising
  *        - 0x0004 (2.500 ms)  ... 0x5DC0 (15000.000 ms) : extended advertising
- *          with STM32WB
- *        - 0x0004 (2.500 ms)  ... 0xFFFF (40959.375 ms) : extended advertising
- *          with STM32WBA
  * @param Peer_Address_Type The address type of the peer device.
  *        Values:
  *        - 0x00: Public Device Address
@@ -1200,26 +1187,13 @@ tBleStatus aci_gap_send_pairing_req( uint16_t Connection_Handle,
                                      uint8_t Force_Rebond );
 
 /**
- * @brief ACI_GAP_RESOLVE_PRIVATE_ADDR
- * This command tries to resolve the address provided with the IRKs present in
- * its database. If the address is resolved successfully with any one of the
- * IRKs present in the database, it returns success and also the corresponding
- * public/static random address stored with the IRK in the database.
- * 
- * @param Address Address to be resolved
- * @param[out] Actual_Address The public or static random address of the peer
- *        device, distributed during pairing phase.
- * @return Value indicating success or error code.
- */
-tBleStatus aci_gap_resolve_private_addr( const uint8_t* Address,
-                                         uint8_t* Actual_Address );
-
-/**
  * @brief ACI_GAP_SET_BROADCAST_MODE
  * This command puts the device into broadcast mode. A privacy enabled device
  * uses either a resolvable private address or a non-resolvable private address
  * as specified in the Own_Address_Type parameter of the command.
- * Note: this command only supports legacy advertising.
+ * Note: this command only supports legacy advertising. For extended
+ * advertising, refer to ACI_GAP_ADV_SET_CONFIGURATION and
+ * ACI_GAP_ADV_SET_ENABLE.
  * 
  * @param Advertising_Interval_Min Minimum advertising interval.
  *        Time = N * 0.625 ms.
@@ -1275,18 +1249,12 @@ tBleStatus aci_gap_set_broadcast_mode( uint16_t Advertising_Interval_Min,
  *        Values:
  *        - 0x0004 (2.500 ms)  ... 0x4000 (10240.000 ms) : legacy advertising
  *        - 0x0004 (2.500 ms)  ... 0x5DC0 (15000.000 ms) : extended advertising
- *          with STM32WB
- *        - 0x0004 (2.500 ms)  ... 0xFFFF (40959.375 ms) : extended advertising
- *          with STM32WBA
  * @param LE_Scan_Window Amount of time for the duration of the LE scan.
  *        LE_Scan_Window shall be less than or equal to LE_Scan_Interval.
  *        Time = N * 0.625 ms.
  *        Values:
  *        - 0x0004 (2.500 ms)  ... 0x4000 (10240.000 ms) : legacy advertising
  *        - 0x0004 (2.500 ms)  ... 0x5DC0 (15000.000 ms) : extended advertising
- *          with STM32WB
- *        - 0x0004 (2.500 ms)  ... 0xFFFF (40959.375 ms) : extended advertising
- *          with STM32WBA
  * @param LE_Scan_Type Passive or active scanning. With passive scanning, no
  *        scan request PDUs are sent.
  *        Values:
@@ -1344,13 +1312,17 @@ tBleStatus aci_gap_get_bonded_devices( uint8_t* Num_of_Addresses,
                                        Bonded_Device_Entry_t* Bonded_Device_Entry );
 
 /**
- * @brief ACI_GAP_IS_DEVICE_BONDED
+ * @brief ACI_GAP_CHECK_BONDED_DEVICE
  * The command finds whether the device, whose address is specified in the
  * command, is present in the bonding table. If the device is found, the
  * command returns "Success".
- * Note: the specified address can be a RPA. In this case, even if privacy is
- * not enabled, this address is resolved to check the presence of the peer
- * device in the bonding table.
+ * Note: the specified address can be a Resolvable Private Address (RPA). In
+ * this case, even if privacy is not enabled, this address is resolved to check
+ * the presence of the peer device in the bonding table. If the address is
+ * resolved successfully with any one of the IRKs present in the database, the
+ * command returns success and also the corresponding public or static random
+ * address stored with the IRK in the database (i.e. the peer device identity
+ * address distributed during bonding).
  * 
  * @param Peer_Address_Type The address type of the peer device.
  *        Values:
@@ -1358,10 +1330,16 @@ tBleStatus aci_gap_get_bonded_devices( uint8_t* Num_of_Addresses,
  *        - 0x01: Random Device Address
  * @param Peer_Address Public Device Address or Random Device Address of the
  *        peer device
+ * @param[out] Id_Address_Type The address type of the peer device, distributed
+ *        during pairing phase.
+ * @param[out] Id_Address The public or static random address of the peer
+ *        device, distributed during pairing phase.
  * @return Value indicating success or error code.
  */
-tBleStatus aci_gap_is_device_bonded( uint8_t Peer_Address_Type,
-                                     const uint8_t* Peer_Address );
+tBleStatus aci_gap_check_bonded_device( uint8_t Peer_Address_Type,
+                                        const uint8_t* Peer_Address,
+                                        uint8_t* Id_Address_Type,
+                                        uint8_t* Id_Address );
 
 /**
  * @brief ACI_GAP_NUMERIC_COMPARISON_VALUE_CONFIRM_YESNO
@@ -1462,24 +1440,6 @@ tBleStatus aci_gap_set_oob_data( uint8_t Device_Type,
                                  uint8_t OOB_Data_Type,
                                  uint8_t OOB_Data_Len,
                                  const uint8_t* OOB_Data );
-
-/**
- * @brief ACI_GAP_ADD_DEVICES_TO_RESOLVING_LIST
- * This  command is used to add devices to the list of address translations
- * used to resolve Resolvable Private Addresses in the Controller.
- * 
- * @param Num_of_Resolving_list_Entries Number of devices that have to be added
- *        to the list.
- * @param Identity_Entry See @ref Identity_Entry_t
- * @param Clear_Resolving_List Clear the resolving list
- *        Values:
- *        - 0x00: Do not clear
- *        - 0x01: Clear before adding
- * @return Value indicating success or error code.
- */
-tBleStatus aci_gap_add_devices_to_resolving_list( uint8_t Num_of_Resolving_list_Entries,
-                                                  const Identity_Entry_t* Identity_Entry,
-                                                  uint8_t Clear_Resolving_List );
 
 /**
  * @brief ACI_GAP_REMOVE_BONDED_DEVICE
@@ -1611,14 +1571,10 @@ tBleStatus aci_gap_additional_beacon_set_data( uint8_t Adv_Data_Length,
  * If bit 0 of Adv_Mode is set, the Own_Address_Type parameter is ignored and
  * the own address shall be set with the ACI_GAP_ADV_SET_RANDOM_ADDRESS
  * command. This mode is only valid for non-connectable advertising.
- * For STM32WBA, this command is deprecated: it is better to use
- * ACI_GAP_ADV_SET_CONFIGURATION_V2.
  * 
  * @param Adv_Mode Bitmap of extended advertising modes
  *        Flags:
  *        - 0x01: Use specific random address
- *        - 0x02: Use LE Coded as primary advertising PHY (not supported on
- *          STM32WB)
  * @param Advertising_Handle Used to identify an advertising set.
  *        Values:
  *        - 0x00 ... 0xEF
@@ -1683,8 +1639,6 @@ tBleStatus aci_gap_additional_beacon_set_data( uint8_t Adv_Data_Length,
  *        Values:
  *        - 0x01: Secondary advertisement PHY is LE 1M
  *        - 0x02: Secondary advertisement PHY is LE 2M
- *        - 0x03: Secondary advertisement PHY is LE Coded (not supported on
- *          STM32WB)
  * @param Adv_SID Value of the Advertising SID subfield in the ADI field of the
  *        PDU.
  *        Values:
@@ -1752,8 +1706,8 @@ tBleStatus aci_gap_adv_set_enable( uint8_t Enable,
  *        - 0x01: The Controller should not fragment or should minimize
  *          fragmentation of data
  * @param Advertising_Data_Length Length of Advertising_Data in octets
- * @param Advertising_Data Data formatted as defined in Bluetooth spec. [Vol 3,
- *        Part C, 11].
+ * @param Advertising_Data Data formatted as defined in Core Specification [Vol
+ *        3, Part C, 11].
  * @return Value indicating success or error code.
  */
 tBleStatus aci_gap_adv_set_adv_data( uint8_t Advertising_Handle,
@@ -1782,8 +1736,8 @@ tBleStatus aci_gap_adv_set_adv_data( uint8_t Advertising_Handle,
  *        - 0x01: The Controller should not fragment or should minimize
  *          fragmentation of data
  * @param Scan_Response_Data_Length Length of Scan_Response_Data in octets
- * @param Scan_Response_Data Data formatted as defined in Bluetooth spec. [Vol
- *        3, Part C, 11].
+ * @param Scan_Response_Data Data formatted as defined in Core Specification
+ *        [Vol 3, Part C, 11].
  * @return Value indicating success or error code.
  */
 tBleStatus aci_gap_adv_set_scan_resp_data( uint8_t Advertising_Handle,
@@ -1832,7 +1786,7 @@ tBleStatus aci_gap_adv_set_random_address( uint8_t Advertising_Handle,
  * advertising feature is supported.
  * The Scanning_PHYs and subsequent parameters are used to specify the scanning
  * parameters as defined for HCI_LE_SET_EXTENDED_SCAN_PARAMETERS: for more
- * details, refer to Bluetooth spec. [Vol 4, Part E, 7.8.64].
+ * details, refer to Core Specification [Vol 4, Part E, 7.8.64].
  * Note: this more generic command can be used instead of
  * ACI_GAP_START_LIMITED_DISCOVERY_PROC, ACI_GAP_START_GENERAL_DISCOVERY_PROC,
  * ACI_GAP_START_GENERAL_CONNECTION_ESTABLISH_PROC,
@@ -1857,10 +1811,11 @@ tBleStatus aci_gap_adv_set_random_address( uint8_t Advertising_Handle,
  *        - 0x01: Static random address
  *        - 0x02: Resolvable private address
  *        - 0x03: Non-resolvable private address
- * @param Filter_Duplicates Enable/disable duplicate filtering.
+ * @param Filter_Duplicates Duplicate filtering.
  *        Values:
  *        - 0x00: Duplicate filtering disabled
  *        - 0x01: Duplicate filtering enabled
+ *        - 0x02: Duplicate filtering enabled, reset for each scan period
  * @param Duration Scan duration.
  *        Time = N * 10 ms.
  *        Values:
@@ -1893,8 +1848,6 @@ tBleStatus aci_gap_adv_set_random_address( uint8_t Advertising_Handle,
  * @param Scanning_PHYs Scan PHYs.
  *        Flags:
  *        - 0x01: Scan advertisements on the LE 1M PHY
- *        - 0x04: Scan advertisements on the LE Coded PHY (not supported on
- *          STM32WB)
  * @param Scan_Param_Phy See @ref Scan_Param_Phy_t
  * @return Value indicating success or error code.
  */
@@ -1913,12 +1866,10 @@ tBleStatus aci_gap_ext_start_scan( uint8_t Scan_Mode,
  * This command is used to create a connection with the local device in the
  * Central role to an advertiser when the extended advertising feature is
  * supported.
- * The Advertising_Handle and Subevent parameters shall be used for a
- * connection to a periodic advertiser. Otherwise, they shall be set to 0xFF.
- * These parameters are ignored on STM32WB.
+ * The Advertising_Handle and Subevent parameters are ignored.
  * The Initiating_PHYs and subsequent parameters are used to specify the
  * initiating parameters as defined for HCI_LE_EXTENDED_CREATE_CONNECTION: for
- * more details, refer to Bluetooth spec. [Vol 4, Part E, 7.8.66].
+ * more details, refer to Core Specification [Vol 4, Part E, 7.8.66].
  * Note: this more generic command can be used instead of
  * ACI_GAP_CREATE_CONNECTION or ACI_GAP_START_AUTO_CONNECTION_ESTABLISH_PROC.
  * 
@@ -1962,8 +1913,6 @@ tBleStatus aci_gap_ext_start_scan( uint8_t Scan_Mode,
  *        - 0x01: Scan connectable advertisements on the LE 1M PHY- Connection
  *          parameters for the LE 1M PHY
  *        - 0x02: Connection parameters for the LE 2M PHY
- *        - 0x04: Scan connectable advertisements on the LE Coded PHY (not
- *          supported on STM32WB)
  * @param Init_Param_Phy See @ref Init_Param_Phy_t
  * @return Value indicating success or error code.
  */

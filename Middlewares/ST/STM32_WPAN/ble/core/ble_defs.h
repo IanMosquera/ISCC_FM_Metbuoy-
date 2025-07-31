@@ -5,7 +5,7 @@
  *****************************************************************************
  * @attention
  *
- * Copyright (c) 2018-2024 STMicroelectronics.
+ * Copyright (c) 2018-2025 STMicroelectronics.
  * All rights reserved.
  *
  * This software is licensed under terms that can be found in the LICENSE file
@@ -144,6 +144,22 @@
 /* Returned when a timeout occurs at BLE application interface
  */
 #define BLE_STATUS_TIMEOUT                              0xFFU
+
+/* ------------------------------------------------------------------------- */
+
+/* BLE stack options (Options)
+ * (ACI_RESET)
+ */
+#define BLE_OPTIONS_LL_ONLY                      0x00000001UL
+#define BLE_OPTIONS_NO_SVC_CHANGE_DESC           0x00000002UL
+#define BLE_OPTIONS_DEV_NAME_READ_ONLY           0x00000004UL
+#define BLE_OPTIONS_EXTENDED_ADV                 0x00000008UL
+#define BLE_OPTIONS_CS_ALGO_2                    0x00000010UL
+#define BLE_OPTIONS_REDUCED_DB_IN_NVM            0x00000020UL
+#define BLE_OPTIONS_GATT_CACHING                 0x00000040UL
+#define BLE_OPTIONS_POWER_CLASS_1                0x00000080UL
+#define BLE_OPTIONS_APPEARANCE_WRITABLE          0x00000100UL
+#define BLE_OPTIONS_ENHANCED_ATT                 0x00000200UL
 
 /* ------------------------------------------------------------------------- */
 
@@ -288,6 +304,7 @@
 #define REASON_DHKEY_CHECK_FAILED                  0x0BU
 #define REASON_NUM_COMPARISON_FAILED               0x0CU
 #define REASON_KEY_REJECTED                        0x0FU
+#define REASON_BUSY                                0x10U
 
 /* Passkey input type detected
  * (ACI_GAP_PASSKEY_INPUT)
@@ -439,20 +456,22 @@
 
 /* ------------------------------------------------------------------------- */
 
-/* Definitions for FW_Error_Type
- * (ACI_HAL_FW_ERROR_EVENT)
+/* Definitions for Warning_Type
+ * (ACI_WARNING_EVENT)
  */
-#define FW_L2CAP_RECOMBINATION_ERROR                 0x01U
-#define FW_GATT_UNEXPECTED_PEER_MESSAGE              0x02U
-#define FW_NVM_LEVEL_WARNING                         0x03U
-#define FW_COC_RX_DATA_LENGTH_TOO_LARGE              0x04U
-#define FW_ECOC_CONN_RSP_ALREADY_ASSIGNED_DCID       0x05U
+#define WARNING_L2CAP_RECOMBINATION_FAILURE          0x01U
+#define WARNING_GATT_UNEXPECTED_PEER_MESSAGE         0x02U
+#define WARNING_NVM_ALMOST_FULL                      0x03U
+#define WARNING_COC_RX_DATA_LENGTH_TOO_LARGE         0x04U
+#define WARNING_COC_ALREADY_ASSIGNED_DCID            0x05U
+#define WARNING_SMP_UNEXPECTED_LTK_REQUEST           0x06U
+#define WARNING_GATT_BEARER_NOT_ALLOCATED            0x07U
 
 /* ------------------------------------------------------------------------- */
 
 /* Offset for configuration values (see ACI_HAL_WRITE_CONFIG_DATA)
  */
-#define CONFIG_DATA_PUBADDR_OFFSET                 0x00U
+#define CONFIG_DATA_PUBLIC_ADDRESS_OFFSET          0x00U
 #define CONFIG_DATA_ER_OFFSET                      0x08U
 #define CONFIG_DATA_IR_OFFSET                      0x18U
 #define CONFIG_DATA_RANDOM_ADDRESS_OFFSET          0x2EU
@@ -468,7 +487,7 @@
 
 /* Length for configuration values (see ACI_HAL_WRITE_CONFIG_DATA)
  */
-#define CONFIG_DATA_PUBADDR_LEN                     6
+#define CONFIG_DATA_PUBLIC_ADDRESS_LEN              6
 #define CONFIG_DATA_ER_LEN                         16
 #define CONFIG_DATA_IR_LEN                         16
 #define CONFIG_DATA_RANDOM_ADDRESS_LEN              6

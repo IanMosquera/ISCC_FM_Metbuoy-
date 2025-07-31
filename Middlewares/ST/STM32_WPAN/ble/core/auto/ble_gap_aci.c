@@ -5,7 +5,7 @@
  *****************************************************************************
  * @attention
  *
- * Copyright (c) 2018-2024 STMicroelectronics.
+ * Copyright (c) 2018-2025 STMicroelectronics.
  * All rights reserved.
  *
  * This software is licensed under terms that can be found in the LICENSE file
@@ -15,7 +15,7 @@
  *****************************************************************************
  */
 
-#include "ble_gap_aci.h"
+#include "auto/ble_gap_aci.h"
 
 tBleStatus aci_gap_set_non_discoverable( void )
 {
@@ -942,32 +942,6 @@ tBleStatus aci_gap_send_pairing_req( uint16_t Connection_Handle,
   return status;
 }
 
-tBleStatus aci_gap_resolve_private_addr( const uint8_t* Address,
-                                         uint8_t* Actual_Address )
-{
-  struct hci_request rq;
-  uint8_t cmd_buffer[BLE_CMD_MAX_PARAM_LEN];
-  aci_gap_resolve_private_addr_cp0 *cp0 = (aci_gap_resolve_private_addr_cp0*)(cmd_buffer);
-  aci_gap_resolve_private_addr_rp0 resp;
-  Osal_MemSet( &resp, 0, sizeof(resp) );
-  int index_input = 0;
-  Osal_MemCpy( (void*)&cp0->Address, (const void*)Address, 6 );
-  index_input += 6;
-  Osal_MemSet( &rq, 0, sizeof(rq) );
-  rq.ogf = 0x3f;
-  rq.ocf = 0x0a0;
-  rq.cparam = cmd_buffer;
-  rq.clen = index_input;
-  rq.rparam = &resp;
-  rq.rlen = sizeof(resp);
-  if ( hci_send_req(&rq, FALSE) < 0 )
-    return BLE_STATUS_TIMEOUT;
-  if ( resp.Status )
-    return resp.Status;
-  Osal_MemCpy( (void*)Actual_Address, (const void*)resp.Actual_Address, 6 );
-  return BLE_STATUS_SUCCESS;
-}
-
 tBleStatus aci_gap_set_broadcast_mode( uint16_t Advertising_Interval_Min,
                                        uint16_t Advertising_Interval_Max,
                                        uint8_t Advertising_Type,
@@ -1073,13 +1047,16 @@ tBleStatus aci_gap_get_bonded_devices( uint8_t* Num_of_Addresses,
   return BLE_STATUS_SUCCESS;
 }
 
-tBleStatus aci_gap_is_device_bonded( uint8_t Peer_Address_Type,
-                                     const uint8_t* Peer_Address )
+tBleStatus aci_gap_check_bonded_device( uint8_t Peer_Address_Type,
+                                        const uint8_t* Peer_Address,
+                                        uint8_t* Id_Address_Type,
+                                        uint8_t* Id_Address )
 {
   struct hci_request rq;
   uint8_t cmd_buffer[BLE_CMD_MAX_PARAM_LEN];
-  aci_gap_is_device_bonded_cp0 *cp0 = (aci_gap_is_device_bonded_cp0*)(cmd_buffer);
-  tBleStatus status = 0;
+  aci_gap_check_bonded_device_cp0 *cp0 = (aci_gap_check_bonded_device_cp0*)(cmd_buffer);
+  aci_gap_check_bonded_device_rp0 resp;
+  Osal_MemSet( &resp, 0, sizeof(resp) );
   int index_input = 0;
   cp0->Peer_Address_Type = Peer_Address_Type;
   index_input += 1;
@@ -1090,11 +1067,15 @@ tBleStatus aci_gap_is_device_bonded( uint8_t Peer_Address_Type,
   rq.ocf = 0x0a4;
   rq.cparam = cmd_buffer;
   rq.clen = index_input;
-  rq.rparam = &status;
-  rq.rlen = 1;
+  rq.rparam = &resp;
+  rq.rlen = sizeof(resp);
   if ( hci_send_req(&rq, FALSE) < 0 )
     return BLE_STATUS_TIMEOUT;
-  return status;
+  if ( resp.Status )
+    return resp.Status;
+  *Id_Address_Type = resp.Id_Address_Type;
+  Osal_MemCpy( (void*)Id_Address, (const void*)resp.Id_Address, 6 );
+  return BLE_STATUS_SUCCESS;
 }
 
 tBleStatus aci_gap_numeric_comparison_value_confirm_yesno( uint16_t Connection_Handle,
@@ -1204,39 +1185,6 @@ tBleStatus aci_gap_set_oob_data( uint8_t Device_Type,
   Osal_MemSet( &rq, 0, sizeof(rq) );
   rq.ogf = 0x3f;
   rq.ocf = 0x0a8;
-  rq.cparam = cmd_buffer;
-  rq.clen = index_input;
-  rq.rparam = &status;
-  rq.rlen = 1;
-  if ( hci_send_req(&rq, FALSE) < 0 )
-    return BLE_STATUS_TIMEOUT;
-  return status;
-}
-
-tBleStatus aci_gap_add_devices_to_resolving_list( uint8_t Num_of_Resolving_list_Entries,
-                                                  const Identity_Entry_t* Identity_Entry,
-                                                  uint8_t Clear_Resolving_List )
-{
-  struct hci_request rq;
-  uint8_t cmd_buffer[BLE_CMD_MAX_PARAM_LEN];
-  aci_gap_add_devices_to_resolving_list_cp0 *cp0 = (aci_gap_add_devices_to_resolving_list_cp0*)(cmd_buffer);
-  aci_gap_add_devices_to_resolving_list_cp1 *cp1 = (aci_gap_add_devices_to_resolving_list_cp1*)(cmd_buffer + 1 + Num_of_Resolving_list_Entries * (sizeof(Identity_Entry_t)));
-  tBleStatus status = 0;
-  int index_input = 0;
-  cp0->Num_of_Resolving_list_Entries = Num_of_Resolving_list_Entries;
-  index_input += 1;
-  /* var_len_data input */
-  {
-    Osal_MemCpy( (void*)&cp0->Identity_Entry, (const void*)Identity_Entry, Num_of_Resolving_list_Entries * (sizeof(Identity_Entry_t)) );
-    index_input += Num_of_Resolving_list_Entries * (sizeof(Identity_Entry_t));
-    {
-      cp1->Clear_Resolving_List = Clear_Resolving_List;
-    }
-    index_input += 1;
-  }
-  Osal_MemSet( &rq, 0, sizeof(rq) );
-  rq.ogf = 0x3f;
-  rq.ocf = 0x0a9;
   rq.cparam = cmd_buffer;
   rq.clen = index_input;
   rq.rparam = &status;

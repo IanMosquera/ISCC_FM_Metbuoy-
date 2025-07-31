@@ -331,10 +331,10 @@ void SVCCTL_InitCustomSvc(void)
    */
   max_attr_record = 6;
 
-  /* USER CODE BEGIN SVCCTL_InitService */
+  /* USER CODE BEGIN SVCCTL_InitService1 */
   /* max_attr_record to be updated if descriptors have been added */
 
-  /* USER CODE END SVCCTL_InitService */
+  /* USER CODE END SVCCTL_InitService1 */
 
   COPY_ICMSERVICE_UUID(uuid.Char_UUID_128);
   ret = aci_gatt_add_service(UUID_TYPE_128,
@@ -563,16 +563,32 @@ tBleStatus Custom_STM_App_Update_Char_Ext(uint16_t Connection_Handle, Custom_STM
       /* USER CODE BEGIN Updated_Length_Service_1_Char_1*/
 
       /* USER CODE END Updated_Length_Service_1_Char_1*/
-	  Generic_STM_App_Update_Char_Ext(Connection_Handle, CustomContext.CustomIcmserviceHdle, CustomContext.CustomTxHdle, SizeTx, pPayload);
+      ret = Generic_STM_App_Update_Char_Ext(Connection_Handle, CustomContext.CustomIcmserviceHdle, CustomContext.CustomTxHdle, SizeTx, pPayload);
 
+      if (ret != BLE_STATUS_SUCCESS)
+      {
+        APP_DBG_MSG("  Fail   : Generic_STM_App_Update_Char_Ext command, result : 0x%x \n\r", ret);
+      }
+      else
+      {
+        APP_DBG_MSG("  Success: Generic_STM_App_Update_Char_Ext command\n\r");
+      }
       break;
 
     case CUSTOM_STM_RX:
       /* USER CODE BEGIN Updated_Length_Service_1_Char_2*/
 
       /* USER CODE END Updated_Length_Service_1_Char_2*/
-	  Generic_STM_App_Update_Char_Ext(Connection_Handle, CustomContext.CustomIcmserviceHdle, CustomContext.CustomRxHdle, SizeRx, pPayload);
+      ret = Generic_STM_App_Update_Char_Ext(Connection_Handle, CustomContext.CustomIcmserviceHdle, CustomContext.CustomRxHdle, SizeRx, pPayload);
 
+      if (ret != BLE_STATUS_SUCCESS)
+      {
+        APP_DBG_MSG("  Fail   : Generic_STM_App_Update_Char_Ext command, result : 0x%x \n\r", ret);
+      }
+      else
+      {
+        APP_DBG_MSG("  Success: Generic_STM_App_Update_Char_Ext command\n\r");
+      }
       break;
 
     default:

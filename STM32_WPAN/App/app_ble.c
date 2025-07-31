@@ -225,9 +225,10 @@ uint8_t index_con_int, mutex;
 /**
  * Advertising Data
  */
-uint8_t a_AdvData[9] =
+uint8_t a_AdvData[14] =
 {
-  8, AD_TYPE_COMPLETE_LOCAL_NAME, 'I', 'C', 'M', '_', 'F', 'M', '2',  /* Complete name */
+  7, AD_TYPE_COMPLETE_LOCAL_NAME, 'I', 'S', '_', 'F', 'M', '2',  /* Complete name */
+  5, AD_TYPE_SHORTENED_LOCAL_NAME , '0', '1', 'S', 'T',  /* Shortened name */
 
 };
 
@@ -298,7 +299,8 @@ void APP_BLE_Init(void)
      CFG_BLE_TX_PATH_COMPENS,
      CFG_BLE_RX_PATH_COMPENS,
      CFG_BLE_CORE_VERSION,
-     CFG_BLE_OPTIONS_EXT
+     CFG_BLE_OPTIONS_EXT,
+	 CFG_BLE_MAX_ADD_EATT_BEARERS
     }
   };
 
@@ -669,17 +671,17 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
         }
         break;
 
-        case ACI_HAL_FW_ERROR_VSEVT_CODE:
+        case ACI_HAL_WARNING_VSEVT_CODE:
         {
-          aci_hal_fw_error_event_rp0 *p_fw_error_event;
+          aci_hal_warning_event_rp0 *p_warning_event;
 
-	      p_fw_error_event = (aci_hal_fw_error_event_rp0 *)p_blecore_evt->data;
-		  UNUSED(p_fw_error_event);
-          APP_DBG_MSG(">>== ACI_HAL_FW_ERROR_VSEVT_CODE\n");
-          APP_DBG_MSG("FW Error Type = 0x%02X\n", p_fw_error_event->FW_Error_Type);
-	      /* USER CODE BEGIN ACI_HAL_FW_ERROR_VSEVT_CODE */
+	      p_warning_event = (aci_hal_warning_event_rp0 *)p_blecore_evt->data;
+		  UNUSED(p_warning_event);
+          APP_DBG_MSG(">>== ACI_HAL_WARNING_VSEVT_CODE\n");
+          APP_DBG_MSG("Warning Type = 0x%02X\n", p_warning_event->Warning_Type);
+	      /* USER CODE BEGIN ACI_HAL_WARNING_VSEVT_CODE */
 
-          /* USER CODE END ACI_HAL_FW_ERROR_VSEVT_CODE */
+          /* USER CODE END ACI_HAL_WARNING_VSEVT_CODE */
           break;
         }
         /* USER CODE BEGIN BLUE_EVT */
@@ -758,14 +760,14 @@ static void Ble_Hci_Gap_Gatt_Init(void)
    * Write the BD Address
    */
   p_bd_addr = BleGetBdAddress();
-  ret = aci_hal_write_config_data(CONFIG_DATA_PUBADDR_OFFSET, CONFIG_DATA_PUBADDR_LEN, (uint8_t*) p_bd_addr);
+  ret = aci_hal_write_config_data(CONFIG_DATA_PUBLIC_ADDRESS_OFFSET, CONFIG_DATA_PUBLIC_ADDRESS_LEN, (uint8_t*) p_bd_addr);
   if (ret != BLE_STATUS_SUCCESS)
   {
-    APP_DBG_MSG("  Fail   : aci_hal_write_config_data command - CONFIG_DATA_PUBADDR_OFFSET, result: 0x%x \n", ret);
+    APP_DBG_MSG("  Fail   : aci_hal_write_config_data command - CONFIG_DATA_PUBLIC_ADDRESS_OFFSET, result: 0x%x \n", ret);
   }
   else
   {
-    APP_DBG_MSG("  Success: aci_hal_write_config_data command - CONFIG_DATA_PUBADDR_OFFSET\n");
+    APP_DBG_MSG("  Success: aci_hal_write_config_data command - CONFIG_DATA_PUBLIC_ADDRESS_OFFSET\n");
     APP_DBG_MSG("  Public Bluetooth Address: %02x:%02x:%02x:%02x:%02x:%02x\n",p_bd_addr[5],p_bd_addr[4],p_bd_addr[3],p_bd_addr[2],p_bd_addr[1],p_bd_addr[0]);
   }
 

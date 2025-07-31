@@ -22,7 +22,7 @@
 #define __STM32WBxx_IT_H
 
 #ifdef __cplusplus
- extern "C" {
+extern "C" {
 #endif
 
 /* Private includes ----------------------------------------------------------*/
@@ -59,7 +59,9 @@ void RTC_WKUP_IRQHandler(void);
 void RCC_IRQHandler(void);
 void EXTI4_IRQHandler(void);
 void USB_LP_IRQHandler(void);
+void TIM1_UP_TIM16_IRQHandler(void);
 void TIM2_IRQHandler(void);
+void USART1_IRQHandler(void);
 void IPCC_C1_RX_IRQHandler(void);
 void IPCC_C1_TX_IRQHandler(void);
 void HSEM_IRQHandler(void);

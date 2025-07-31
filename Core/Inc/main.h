@@ -72,9 +72,9 @@ void PrintPC(char *szFormat, ...);
 #define CE5V_GPIO_Port GPIOA
 #define ENUVLO_Pin GPIO_PIN_1
 #define ENUVLO_GPIO_Port GPIOB
-#define SW1_Pin GPIO_PIN_4
-#define SW1_GPIO_Port GPIOE
-#define SW1_EXTI_IRQn EXTI4_IRQn
+#define SW_OFF_Pin GPIO_PIN_4
+#define SW_OFF_GPIO_Port GPIOE
+#define SW_OFF_EXTI_IRQn EXTI4_IRQn
 
 /* USER CODE BEGIN Private defines */
 #define ADDR_FLASH_PAGE_0     ((uint32_t)0x08000000) /* Base @ of Page 0, 4 Kbytes */
