@@ -73,11 +73,8 @@ TIM_HandleTypeDef htim2;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-// LTC4162 Variables
 LTC4162 ltc;
 
-// PrintPC Variables
-uint8_t BusyFlag = FREE_FLAG;
 static char str[133], strDisplay[133];
 
 /* START - ADC variables */
@@ -102,8 +99,8 @@ uint8_t longpress_duration;
 uint8_t UART1_rxBuffer[12] = {0};
 
 // STS40 Variables
-uint8_t	STS40_RXBuffer[3];     // RX buffer for I2C
-uint8_t	sts40_TXCODE; 	// measure T with highest precision
+uint8_t	STS40_RXBuffer[3];    // RX buffer for I2C
+uint8_t	sts40_TXCODE; 				// measure T with highest precision
 volatile float Temp_C;
 
 
@@ -127,6 +124,7 @@ static void MX_ADC1_Init(void);
 static void MX_RF_Init(void);
 /* USER CODE BEGIN PFP */
 static void ISCC_GPIO_Init(void);
+
 //static void ADC_Init(void);
 
 /*void uart1_handler(void);
@@ -190,20 +188,19 @@ int main(void)
 
   HAL_Delay(3000);
 
-  PrintPC("\r\n\r\nInitiate RTC");
+  xprintf(PC, "\r\n\r\nInitiate RTC");
   RTC_Init();
 
-  PrintPC("\r\n\r\nASTI iSCC FW: 1.0.1");
+  xprintf(PC, "\r\n\r\nASTI iSCC FW: 1.0.1");
 
-  PrintPC("\r\n\r\nInitiate LTC Device");
+  xprintf(PC, "\r\n\r\nInitiate LTC Device");
+
   LTC_Init(&ltc);
 
   //ADC_Init();
   //HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buff, 32);
 
-
   ISCC_GPIO_Init();
-
 
   /* USER CODE END 2 */
 
@@ -599,7 +596,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 32000-1;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 2000-1;
+  htim2.Init.Period = 100-1;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -852,69 +849,7 @@ void GetSTS40TempC(void){
 	Temp_C = ((rawTemp/65535.0f) * 175.0f) - 45.0f;
 }
 
-void PrintPC(char *szFormat, ...){
-  uint8_t 	i;
-  uint8_t 	*uintval;
-  float 		*fval;
-  int8_t 		*sval;
-  uint8_t 	fmtDetect;
-  char  		*pt;
-  va_list 	ptArg;
 
-  if (BusyFlag == FREE_FLAG){
-		BusyFlag = BUSY_FLAG;
-		fmtDetect = 0;
-		va_start(ptArg, szFormat);
-		i = 0;
-
-		for (pt = szFormat; *pt != 0; ++pt){
-			str[i++] = *pt;
-			if (fmtDetect == 0){
-				if (*pt == '%') fmtDetect = 1;
-			}
-			else{
-				switch (*pt){
-					case 'c':
-						break;
-
-					case 'd':
-						fmtDetect = 0;
-						str[i++] = 0;
-						uintval = va_arg(ptArg, uint8_t *);
-						sprintf((char *) strDisplay, (char *) str, uintval);
-						i = 0;
-						CDC_Transmit_FS((uint8_t *)strDisplay, strlen((char *)strDisplay));
-						break;
-
-					case 'f':
-						fmtDetect = 0;
-						str[i++] = 0;
-						fval = va_arg(ptArg, float *);
-						sprintf((char *) strDisplay, (char *) str, fval);
-						i = 0;
-						CDC_Transmit_FS((uint8_t *)strDisplay, strlen((char *)strDisplay));
-						break;
-
-					case 's':
-						fmtDetect = 0;
-						str[i++] = 0;
-						sval = va_arg(ptArg, int8_t *);
-						sprintf((char *) strDisplay, (char *) str, sval);
-						i = 0;
-						CDC_Transmit_FS((uint8_t *)strDisplay, strlen(strDisplay));
-						break;
-
-					default:
-						break;
-				}
-			}
-		}
-		str[i++] = 0;
-//		CDC_Transmit_FS((uint8_t *)str, strlen(str));
-		va_end(ptArg);
-		BusyFlag = FREE_FLAG;
-  }
-}
 /* USER CODE END 4 */
 
 /**

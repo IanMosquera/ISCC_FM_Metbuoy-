@@ -80,33 +80,32 @@ extern I2C_HandleTypeDef hi2c1;
 extern TIM_HandleTypeDef htim2;
 
 extern LTC4162 ltc;
-
-
-static char	a_SzString[70];		/*buffer for everything else*/
-uint8_t txbuff[70];
-
-char system_Message[128];
-
-// ADC Variables
 extern float gIMON;
-
-// STS40 Variables
 extern uint8_t	STS40_RXBuffer[3];     // RX buffer for I2C
 extern uint8_t	sts40_TXCODE; 	// measure T with highest precision
 extern volatile float Temp_C;
-
-// RTC Variables
 extern RTC_HandleTypeDef hrtc;
+
+static char	a_SzString[70];		/*buffer for everything else*/
+
+bool QuickTwoBlink_Flag = false;
+bool SW_Pressed_Flag = false;
+
+char system_Message[128];
+
+uint8_t txbuff[70];
 uint8_t aShowTime[16] = "hh:ms:ss";
 uint8_t aShowDateTime[20] = "YY/MM/DD,hh:ms:ss";
 uint8_t rtcTime[12]	=	 "12:03:00";
 uint8_t rtcDate[14]	=	 "24-02-01";
+uint8_t ReadDataTimer = 0;
+uint8_t LED_Ctr = 0;
+uint8_t LongPress_Ctr = 0;
+uint16_t Prog_Ctr;
+
 RTC_TimeTypeDef sTime;
 RTC_DateTypeDef sDate;
 
-uint8_t ReadDataTimer;
-
-uint16_t Prog_Ctr;
 
 /* USER CODE END PV */
 
@@ -116,6 +115,8 @@ static void Custom_Rx_Update_Char(void);
 static void Custom_Rx_Send_Notification(void);
 
 /* USER CODE BEGIN PFP */
+void LED_STAT(void);
+bool LongPressed(void);
 void ReadChargingData(void);
 void ReadTempData(void);
 void ReadConfigBitsRegister(void);
@@ -123,11 +124,13 @@ void ReadSystemStatusRegister(void);
 void ReadGIMON(void);
 void ReadOutCurrent(void);
 void FilterCommands(uint8_t * pPayload, uint8_t Length);
+void ReadDataTasks(void);
 void ReadRTCTime(void);
 void ReadRTCDate(void);
 
+
 bool TimeToReadData(void);
-void CountProgramCounter(void);
+
 
 /* USER CODE END PFP */
 
@@ -246,18 +249,58 @@ void Custom_APP_Init(void)
 }
 
 /* USER CODE BEGIN FD */
-
-void CountProgramCounter(void)
+void LED_STAT(void)
 {
-	if (Prog_Ctr >= 299) //15 min
+	if (QuickTwoBlink_Flag)
 	{
-		Prog_Ctr = 0;
+		if (LED_Ctr >=4)
+		{
+			LED_Ctr = 0;
+			QuickTwoBlink_Flag = false;
+		}
+		else
+		{
+			if (LED_Ctr == 0) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_SET);
+			if (LED_Ctr == 1) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_RESET);
+			if (LED_Ctr == 2) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_SET);
+			if (LED_Ctr == 3) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_RESET);
+			LED_Ctr++;
+		}
 	}
 	else
 	{
-		Prog_Ctr++;
+		// Toogle LED every Second
+		if (LED_Ctr >= 9)
+		{
+			HAL_GPIO_TogglePin(STAT_GPIO_Port, STAT_Pin);
+			LED_Ctr = 0;
+		}
+		else
+		{
+			LED_Ctr++;
+		}
 	}
 }
+
+
+
+
+bool LongPressed(void)
+{
+	if (LongPress_Ctr >=29)
+	{
+		LongPress_Ctr = 0;
+		return true;
+	}
+	else
+	{
+		LongPress_Ctr++;
+		return false;
+	}
+}
+
+
+
 
 void ReadChargingData(void){
 	//RTC_ReadDate(rtcDate);
@@ -291,23 +334,35 @@ void ReadChargingData(void){
 																	ltc.chargeStatusStr);
 
 	SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
-	PrintPC("%s", system_Message);
+	xprintf(PC, "%s", system_Message);
 }
+
+
+
+void ReadDataTasks(void)
+{
+	UTIL_SEQ_SetTask(1 << CFG_TASK_READCHGDATA, CFG_SCH_PRIO_0);
+	UTIL_SEQ_SetTask(1 << CFG_TASK_READCFBTREG, CFG_SCH_PRIO_0);
+	UTIL_SEQ_SetTask(1 << CFG_TASK_READSYSSTREG, CFG_SCH_PRIO_0);
+	UTIL_SEQ_SetTask(1 << CFG_TASK_READTEMPDATA, CFG_SCH_PRIO_0);
+}
+
 
 void ReadTempData(void){
 	LTC4162_ReadDieTemp(&ltc);
 	LTC4162_ReadNTC(&ltc);
 	GetSTS40TempC();
 
-	sprintf((char *)system_Message, "DieTemp: %5.2f, "
-																	"NTC: %5.2f, "
-																	"BoardTemp: %5.2f\r\n",
+	sprintf((char *)system_Message,
+			"DieTemp: %5.2f, "
+			"NTC: %5.2f, "
+			"BoardTemp: %5.2f\r\n",
 			ltc.dieTemp,
 			ltc.NTCDegrees,
 			Temp_C);
 
 	SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
-	PrintPC("%s", system_Message);
+	xprintf(PC, "%s", system_Message);
 }
 
 void ReadConfigBitsRegister(void){
@@ -329,7 +384,7 @@ void ReadConfigBitsRegister(void){
 			ltc.confBits.suspend_charger?"susp_chg ":"");
 
 	SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
-	PrintPC("%s", system_Message);
+	xprintf(PC, "%s", system_Message);
 }
 
 void ReadSystemStatusRegister(void){
@@ -346,7 +401,7 @@ void ReadSystemStatusRegister(void){
 				ltc.ssReg.en_chg?"en_chg ":"");
 
 		SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
-		PrintPC("%s", system_Message);
+		xprintf(PC, "%s", system_Message);;
 }
 
 void ReadOutCurrent(void){
@@ -556,10 +611,26 @@ void SPP_Transmit(void){
 }
 
 
+bool TimeToReadData(void)
+{
+	if (ReadDataTimer >= 19)
+	{
+		ReadDataTimer = 0;
+		return true;
+	}
+	else
+	{
+		ReadDataTimer++;
+		return false;
+	}
+}
+
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
   if (GPIO_Pin == SW_OFF_Pin)
   {
+  	SW_Pressed_Flag = true;
+
   	sprintf(a_SzString, "SW_OFF button pressed\r\n");
 		UTIL_SEQ_SetTask(1 << CFG_TASK_SEND_STR, CFG_SCH_PRIO_0);
   }
@@ -570,16 +641,34 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
  *  @param	*htim	Timer handler
  *  @retval 	None
  */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
 	if (htim == &htim2)
 	{
-		CountProgramCounter();
 
-		UTIL_SEQ_SetTask(1 << CFG_TASK_READCHGDATA, CFG_SCH_PRIO_0);
-		UTIL_SEQ_SetTask(1 << CFG_TASK_READCFBTREG, CFG_SCH_PRIO_0);
-		UTIL_SEQ_SetTask(1 << CFG_TASK_READSYSSTREG, CFG_SCH_PRIO_0);
-		UTIL_SEQ_SetTask(1 << CFG_TASK_READTEMPDATA, CFG_SCH_PRIO_0);
-		HAL_GPIO_TogglePin(STAT_GPIO_Port, STAT_Pin);
+		if (TimeToReadData())
+		{
+			ReadDataTasks();
+			//HAL_GPIO_TogglePin(STAT_GPIO_Port, STAT_Pin);
+		}
+
+
+
+		if (SW_Pressed_Flag)
+		{
+			if (LongPressed())
+			{
+				if (HAL_GPIO_ReadPin(SW_OFF_GPIO_Port, SW_OFF_Pin) == GPIO_PIN_RESET)
+				{
+					HAL_GPIO_TogglePin(DS_EFUSE_GPIO_Port, DS_EFUSE_Pin);
+					QuickTwoBlink_Flag = true;
+					LED_Ctr = 0;
+				}
+				SW_Pressed_Flag = false;
+			}
+		}
+
+		LED_STAT();
 	}
 }
 /* USER CODE END FD_LOCAL_FUNCTIONS*/
