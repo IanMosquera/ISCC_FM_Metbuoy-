@@ -99,6 +99,7 @@ uint8_t aShowDateTime[20] = "YY/MM/DD,hh:ms:ss";
 uint8_t rtcTime[12]	=	 "12:03:00";
 uint8_t rtcDate[14]	=	 "24-02-01";
 uint8_t ReadDataTimer = 0;
+uint8_t ReadLoadCurrentTimer = 0;
 uint8_t LED_Ctr = 0;
 uint8_t LongPress_Ctr = 0;
 uint16_t Prog_Ctr;
@@ -122,14 +123,16 @@ void ReadTempData(void);
 void ReadConfigBitsRegister(void);
 void ReadSystemStatusRegister(void);
 void ReadGIMON(void);
-void ReadOutCurrent(void);
+void ReadLoadCurrent(void);
 void FilterCommands(uint8_t * pPayload, uint8_t Length);
-void ReadDataTasks(void);
+void TaskReadData(void);
 void ReadRTCTime(void);
 void ReadRTCDate(void);
+void ReadRTCTask(void);
 
 
 bool TimeToReadData(void);
+bool TimeToReadLoadCurrent(void);
 
 
 /* USER CODE END PFP */
@@ -231,11 +234,13 @@ void Custom_APP_Init(void)
 {
   /* USER CODE BEGIN CUSTOM_APP_Init */
 
-	UTIL_SEQ_RegTask(1 << CFG_TASK_READCHGDATA,  UTIL_SEQ_RFU, ReadChargingData);
-	UTIL_SEQ_RegTask(1 << CFG_TASK_READTEMPDATA, UTIL_SEQ_RFU, ReadTempData);
-	UTIL_SEQ_RegTask(1 << CFG_TASK_READCFBTREG,  UTIL_SEQ_RFU, ReadConfigBitsRegister);
-	UTIL_SEQ_RegTask(1 << CFG_TASK_READSYSSTREG, UTIL_SEQ_RFU, ReadSystemStatusRegister);
-	UTIL_SEQ_RegTask(1 << CFG_TASK_SEND_STR, 		UTIL_SEQ_RFU, SPP_Transmit);
+	UTIL_SEQ_RegTask(1 << CFG_TASK_READCHGDATA,  	UTIL_SEQ_RFU, ReadChargingData);
+	UTIL_SEQ_RegTask(1 << CFG_TASK_READ_IOUT,  		UTIL_SEQ_RFU, ReadLoadCurrent);
+	UTIL_SEQ_RegTask(1 << CFG_TASK_READTEMPDATA,	UTIL_SEQ_RFU, ReadTempData);
+	UTIL_SEQ_RegTask(1 << CFG_TASK_READCFBTREG,		UTIL_SEQ_RFU, ReadConfigBitsRegister);
+	UTIL_SEQ_RegTask(1 << CFG_TASK_READ_RTC_DATA,	UTIL_SEQ_RFU, ReadRTCTask);
+	UTIL_SEQ_RegTask(1 << CFG_TASK_READSYSSTREG, 	UTIL_SEQ_RFU, ReadSystemStatusRegister);
+	UTIL_SEQ_RegTask(1 << CFG_TASK_SEND_STR, 			UTIL_SEQ_RFU, SPP_Transmit);
 
 
 	sprintf(a_SzString, "BLE Transmit Test\r\n");
@@ -249,190 +254,9 @@ void Custom_APP_Init(void)
 }
 
 /* USER CODE BEGIN FD */
-void LED_STAT(void)
+
+void FilterCommands(uint8_t * pPayload, uint8_t Length)
 {
-	if (QuickTwoBlink_Flag)
-	{
-		if (LED_Ctr >=4)
-		{
-			LED_Ctr = 0;
-			QuickTwoBlink_Flag = false;
-		}
-		else
-		{
-			if (LED_Ctr == 0) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_SET);
-			if (LED_Ctr == 1) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_RESET);
-			if (LED_Ctr == 2) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_SET);
-			if (LED_Ctr == 3) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_RESET);
-			LED_Ctr++;
-		}
-	}
-	else
-	{
-		// Toogle LED every Second
-		if (LED_Ctr >= 9)
-		{
-			HAL_GPIO_TogglePin(STAT_GPIO_Port, STAT_Pin);
-			LED_Ctr = 0;
-		}
-		else
-		{
-			LED_Ctr++;
-		}
-	}
-}
-
-
-
-
-bool LongPressed(void)
-{
-	if (LongPress_Ctr >=29)
-	{
-		LongPress_Ctr = 0;
-		return true;
-	}
-	else
-	{
-		LongPress_Ctr++;
-		return false;
-	}
-}
-
-
-
-
-void ReadChargingData(void){
-	//RTC_ReadDate(rtcDate);
-	//RTC_ReadTime(rtcTime);
-
-	LTC4162_ReadIIN(&ltc);
-	LTC4162_ReadIBAT(&ltc);
-	LTC4162_ReadVIN(&ltc);
-	LTC4162_ReadVOUT(&ltc);
-	LTC4162_ReadVBAT(&ltc);
-	LTC4162_ReadChargerState(&ltc);
-	LTC4162_ReadChargeStatus(&ltc);
-	ReadOutCurrent();
-//	ReadGIMON();
-
-	sprintf((char *)system_Message, "\r\nCHG_DATA: %5.2f, "
-																	"%6.3f, "
-																	"%5.2f, "
-																	"%6.3f, "
-																	"%5.2f, "
-																	"%6.3f, "
-																	"%s, "
-																	"%s\r\n",
-																	ltc.vIN,
-																	ltc.iIN,
-																	ltc.vBAT,
-																	ltc.iBAT,
-																	ltc.vOUT,
-																	ltc.iOUT,
-																	ltc.chargerStateStr,
-																	ltc.chargeStatusStr);
-
-	SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
-	xprintf(PC, "%s", system_Message);
-}
-
-
-
-void ReadDataTasks(void)
-{
-	UTIL_SEQ_SetTask(1 << CFG_TASK_READCHGDATA, CFG_SCH_PRIO_0);
-	UTIL_SEQ_SetTask(1 << CFG_TASK_READCFBTREG, CFG_SCH_PRIO_0);
-	UTIL_SEQ_SetTask(1 << CFG_TASK_READSYSSTREG, CFG_SCH_PRIO_0);
-	UTIL_SEQ_SetTask(1 << CFG_TASK_READTEMPDATA, CFG_SCH_PRIO_0);
-}
-
-
-void ReadTempData(void){
-	LTC4162_ReadDieTemp(&ltc);
-	LTC4162_ReadNTC(&ltc);
-	GetSTS40TempC();
-
-	sprintf((char *)system_Message,
-			"DieTemp: %5.2f, "
-			"NTC: %5.2f, "
-			"BoardTemp: %5.2f\r\n",
-			ltc.dieTemp,
-			ltc.NTCDegrees,
-			Temp_C);
-
-	SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
-	xprintf(PC, "%s", system_Message);
-}
-
-void ReadConfigBitsRegister(void){
-	LTC4162_ReadConfigBitsReg(&ltc);
-
-	// If there is sun, reset system configuration to zero
-	if (ltc.ssReg.vin_gt_vbat){
-		LTC4162_WriteConfigBitsReg(&ltc, zero_cfg);
-	}
-	else {
-		LTC4162_WriteConfigBitsReg(&ltc, force_telemetry_on | telemetry_speed);
-	}
-
-	sprintf((char *)system_Message, "CON_BITS: %s%s%s%s%s\r\n",
-			ltc.confBits.mppt_en?"mppt_en, ":"",
-			ltc.confBits.force_telemetry_on?"f_tel_on, ":"",
-			ltc.confBits.telemetry_speed?"tel_HS, ":"",
-			ltc.confBits.run_bsr?"run_bsr, ":"",
-			ltc.confBits.suspend_charger?"susp_chg ":"");
-
-	SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
-	xprintf(PC, "%s", system_Message);
-}
-
-void ReadSystemStatusRegister(void){
-	LTC4162_ReadSystemStatusReg(&ltc);
-
-	sprintf((char *)system_Message, "SYS_STAT: %s%s%s%s%s%s%s%s\r\n",
-				ltc.ssReg.intvcc_gt_2p8v?"intvcc>2.8v, ":"",
-				ltc.ssReg.vin_gt_4p2v?"vin>4.2v, ":"",
-				ltc.ssReg.vin_gt_vbat?"vin>vbat, ":"",
-				ltc.ssReg.vin_ovlo?"vin_ovlo, ":"",
-				ltc.ssReg.thermal_shutdown?"thm_shdn, ":"",
-				ltc.ssReg.no_rt?"no_rt, ":"",
-				ltc.ssReg.cell_count_err?"cell_ctr_err, ":"",
-				ltc.ssReg.en_chg?"en_chg ":"");
-
-		SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
-		xprintf(PC, "%s", system_Message);;
-}
-
-void ReadOutCurrent(void){
-	LTC4162_ReadConfigBitsReg(&ltc);
-	LTC4162_ReadSystemStatusReg(&ltc);
-	//if (ltc.ssReg.vin_gt_vbat == 0) LTC4162_WriteConfigBitsReg(&ltc, force_telemetry_on | telemetry_speed);
-
-	if (ltc.ssReg.vin_gt_vbat){
-		if(ltc.ssReg.en_chg){
-			// suspend charger
-			// SetConfigBitsReg(&ltc, suspend_charger);
-			// HAL_Delay(20);
-			ltc.iOUT = ltc.iIN - ltc.iBAT;
-			// clear suspend charger
-			//SetConfigBitsReg(&ltc, force_telemetry_on | telemetry_speed);
-		}
-		else{
-			//SetConfigBitsReg(&ltc, force_telemetry_on | telemetry_speed);
-			HAL_Delay(20);
-			ltc.iOUT = ltc.iIN;
-		}
-	}else{
-		// SetConfigBitsReg(&ltc, force_telemetry_on | telemetry_speed);
-
-		ltc.iOUT = ltc.iBAT;
-	}
-
-
-}
-
-void FilterCommands(uint8_t * pPayload, uint8_t Length){
 	uint8_t address, buf[2];
 	uint8_t str[64];
 	uint16_t val;
@@ -527,6 +351,203 @@ void FilterCommands(uint8_t * pPayload, uint8_t Length){
 	}
 }
 
+
+
+void LED_STAT(void)
+{
+	if (QuickTwoBlink_Flag)
+	{
+		if (LED_Ctr >=4)
+		{
+			LED_Ctr = 0;
+			QuickTwoBlink_Flag = false;
+		}
+		else
+		{
+			if (LED_Ctr == 0) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_SET);
+			if (LED_Ctr == 1) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_RESET);
+			if (LED_Ctr == 2) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_SET);
+			if (LED_Ctr == 3) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_RESET);
+			LED_Ctr++;
+		}
+	}
+	else
+	{
+		// Toogle LED every Second
+		if (LED_Ctr >= 9)
+		{
+			HAL_GPIO_TogglePin(STAT_GPIO_Port, STAT_Pin);
+			LED_Ctr = 0;
+		}
+		else
+		{
+			LED_Ctr++;
+		}
+	}
+}
+
+
+
+
+bool LongPressed(void)
+{
+	if (LongPress_Ctr >=29)
+	{
+		LongPress_Ctr = 0;
+		return true;
+	}
+	else
+	{
+		LongPress_Ctr++;
+		return false;
+	}
+}
+
+
+
+
+void ReadChargingData(void)
+{
+	LTC4162_ReadVIN(&ltc);
+	LTC4162_ReadIIN(&ltc);
+	LTC4162_ReadVBAT(&ltc);
+	LTC4162_ReadIBAT(&ltc);
+	LTC4162_ReadVOUT(&ltc);
+	LTC4162_ReadChargerState(&ltc);
+	LTC4162_ReadChargeStatus(&ltc);
+
+	sprintf((char *)system_Message, "\r\nCHG_DATA: "
+																	"%5.2f, "
+																	"%6.3f, "
+																	"%5.2f, "
+																	"%6.3f, "
+																	"%5.2f, "
+																	"%s, %s\r\n",
+																	ltc.vIN,
+																	ltc.iIN,
+																	ltc.vBAT,
+																	ltc.iBAT,
+																	ltc.vOUT,
+																	ltc.chargerStateStr, ltc.chargeStatusStr);
+
+	SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
+	xprintf(PC, "%s", system_Message);
+}
+
+
+
+
+
+
+
+
+void ReadTempData(void){
+	LTC4162_ReadDieTemp(&ltc);
+	LTC4162_ReadNTC(&ltc);
+	GetSTS40TempC();
+
+	sprintf((char *)system_Message,
+			"DieTemp : %5.2f, "
+			"NTC: %5.2f, "
+			"BoardTemp: %5.2f\r\n",
+			ltc.dieTemp,
+			ltc.NTCDegrees,
+			Temp_C);
+
+	SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
+	xprintf(PC, "%s", system_Message);
+}
+
+
+
+void ReadConfigBitsRegister(void){
+	LTC4162_ReadConfigBitsReg(&ltc);
+
+	// If there is sun, reset system configuration to zero
+	if (ltc.ssReg.vin_gt_vbat){
+		LTC4162_WriteConfigBitsReg(&ltc, zero_cfg);
+	}
+	else {
+		LTC4162_WriteConfigBitsReg(&ltc, force_telemetry_on | telemetry_speed);
+	}
+
+	sprintf((char *)system_Message, "CON_BITS: %s%s%s%s%s\r\n",
+			ltc.confBits.mppt_en?"mppt_en, ":"",
+			ltc.confBits.force_telemetry_on?"f_tel_on, ":"",
+			ltc.confBits.telemetry_speed?"tel_HS, ":"",
+			ltc.confBits.run_bsr?"run_bsr, ":"",
+			ltc.confBits.suspend_charger?"susp_chg ":"");
+
+	SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
+	xprintf(PC, "%s", system_Message);
+}
+
+void ReadSystemStatusRegister(void){
+	LTC4162_ReadSystemStatusReg(&ltc);
+
+	sprintf((char *)system_Message, "SYS_STAT: %s%s%s%s%s%s%s%s\r\n",
+				ltc.ssReg.intvcc_gt_2p8v?"intvcc>2.8v, ":"",
+				ltc.ssReg.vin_gt_4p2v?"vin>4.2v, ":"",
+				ltc.ssReg.vin_gt_vbat?"vin>vbat, ":"",
+				ltc.ssReg.vin_ovlo?"vin_ovlo, ":"",
+				ltc.ssReg.thermal_shutdown?"thm_shdn, ":"",
+				ltc.ssReg.no_rt?"no_rt, ":"",
+				ltc.ssReg.cell_count_err?"cell_ctr_err, ":"",
+				ltc.ssReg.en_chg?"en_chg ":"");
+
+		SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
+		xprintf(PC, "%s", system_Message);;
+}
+
+
+
+
+
+void ReadLoadCurrent(void)
+{
+	LTC4162_ReadConfigBitsReg(&ltc);
+	LTC4162_ReadSystemStatusReg(&ltc);
+	//if (ltc.ssReg.vin_gt_vbat == 0) LTC4162_WriteConfigBitsReg(&ltc, force_telemetry_on | telemetry_speed);
+
+	if (ltc.ssReg.vin_gt_vbat){
+		if(ltc.ssReg.en_chg){
+			// suspend charger
+			SetConfigBitsReg(&ltc, suspend_charger);
+			HAL_Delay(500);
+			LTC4162_ReadIIN(&ltc);
+			ltc.iOUT = ltc.iIN;
+			sprintf((char *)system_Message, "LOAD_CUR: %6.3f\r\n", ltc.iOUT);
+			SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
+			// clear suspend charger
+			SetConfigBitsReg(&ltc, zero_cfg);
+		}
+		else{
+			SetConfigBitsReg(&ltc, force_telemetry_on | telemetry_speed);
+			HAL_Delay(500);
+			LTC4162_ReadIIN(&ltc);
+			ltc.iOUT = ltc.iIN;
+			sprintf((char *)system_Message, "LOAD_CUR: %6.3f\r\n", ltc.iOUT);
+			SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
+			SetConfigBitsReg(&ltc, zero_cfg);
+		}
+	}else{
+		SetConfigBitsReg(&ltc, force_telemetry_on | telemetry_speed);
+		LTC4162_ReadIBAT(&ltc);
+		ltc.iOUT = -ltc.iBAT;
+		sprintf((char *)system_Message, "LOAD_CUR: %6.3f\r\n", ltc.iOUT);
+		SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
+		SetConfigBitsReg(&ltc, zero_cfg);
+	}
+}
+
+
+
+
+
+
+
+
+
 void ReadRTCTime(void){
 	//Get RTC time, other parameters to be displayed are taken from
 	HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
@@ -537,11 +558,25 @@ void ReadRTCTime(void){
 }
 
 void ReadRTCDate(void){
-	//Get RTC time, other parameters to be displayed are taken from
 	HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
-	//Save date to buffer
 	sprintf((char *)rtcDate,   "%02d-%02d-%02d ", sDate.Year, sDate.Month, sDate.Date);
 }
+
+
+void ReadRTCTask(void)
+{
+	RTC_ReadDate(rtcDate);
+	RTC_ReadTime(rtcTime);
+	RTC_ReadDate(rtcDate);
+	RTC_ReadTime(rtcTime);
+
+	sprintf((char *)system_Message, "RTC: %s %s\r\n", rtcDate, rtcTime);
+	SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
+	xprintf(PC, "%s", system_Message);
+}
+
+
+
 
 void ReadGIMON(void){
 //	uint16_t temp;
@@ -611,9 +646,23 @@ void SPP_Transmit(void){
 }
 
 
+
+
+void TaskReadData(void)
+{
+	//UTIL_SEQ_SetTask(1 << CFG_TASK_READ_RTC_DATA, CFG_SCH_PRIO_0);
+	UTIL_SEQ_SetTask(1 << CFG_TASK_READCHGDATA, CFG_SCH_PRIO_0);
+	UTIL_SEQ_SetTask(1 << CFG_TASK_READCFBTREG, CFG_SCH_PRIO_0);
+	UTIL_SEQ_SetTask(1 << CFG_TASK_READSYSSTREG, CFG_SCH_PRIO_0);
+	UTIL_SEQ_SetTask(1 << CFG_TASK_READTEMPDATA, CFG_SCH_PRIO_0);
+}
+
+
+
+
 bool TimeToReadData(void)
 {
-	if (ReadDataTimer >= 19)
+	if (ReadDataTimer >= 49)
 	{
 		ReadDataTimer = 0;
 		return true;
@@ -624,6 +673,26 @@ bool TimeToReadData(void)
 		return false;
 	}
 }
+
+
+
+bool TimeToReadLoadCurrent(void)
+{
+	if (ReadLoadCurrentTimer >= 29)
+	{
+		ReadLoadCurrentTimer = 0;
+		return true;
+	}
+	else
+	{
+		ReadLoadCurrentTimer++;
+		return false;
+	}
+
+}
+
+
+
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
@@ -648,8 +717,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 		if (TimeToReadData())
 		{
-			ReadDataTasks();
+			TaskReadData();
 			//HAL_GPIO_TogglePin(STAT_GPIO_Port, STAT_Pin);
+		}
+
+		if (TimeToReadLoadCurrent())
+		{
+			UTIL_SEQ_SetTask(1 << CFG_TASK_READ_IOUT, CFG_SCH_PRIO_0);
 		}
 
 

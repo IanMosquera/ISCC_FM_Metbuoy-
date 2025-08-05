@@ -75,7 +75,7 @@ UART_HandleTypeDef huart1;
 /* USER CODE BEGIN PV */
 LTC4162 ltc;
 
-static char str[133], strDisplay[133];
+//static char str[133], strDisplay[133];
 
 /* START - ADC variables */
 extern uint16_t	buf_avg[2];
@@ -89,23 +89,10 @@ double 		AVE_Current_Consumption;
 double 		MAX9938Vout;
 /* END - ADC variables */
 
-/* START - Switch variables */
-uint8_t switch_Mode;
-uint8_t switch_Counter;
-uint8_t longpress_duration;
-/* End - Switch variables */
-
-/* START - UART variables */
-uint8_t UART1_rxBuffer[12] = {0};
-
-// STS40 Variables
 uint8_t	STS40_RXBuffer[3];    // RX buffer for I2C
 uint8_t	sts40_TXCODE; 				// measure T with highest precision
 volatile float Temp_C;
 
-
-/*char my_uart_buffer[256];
-int my_uart_buffer_index = 0;*/
 /* END - UART variables */
 
 /* USER CODE END PV */
@@ -124,12 +111,6 @@ static void MX_ADC1_Init(void);
 static void MX_RF_Init(void);
 /* USER CODE BEGIN PFP */
 static void ISCC_GPIO_Init(void);
-
-//static void ADC_Init(void);
-
-/*void uart1_handler(void);
-void uart1_idleHandler(void);*/
-//static uint32_t GetPage(uint32_t Addr);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -241,6 +222,11 @@ void SystemClock_Config(void)
   */
   __HAL_RCC_PLL_PLLSOURCE_CONFIG(RCC_PLLSOURCE_HSE);
 
+  /** Configure LSE Drive Capability
+  */
+  HAL_PWR_EnableBkUpAccess();
+  __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_MEDIUMHIGH);
+
   /** Configure the main internal regulator output voltage
   */
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
@@ -249,12 +235,12 @@ void SystemClock_Config(void)
   * in the RCC_OscInitTypeDef structure.
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI48|RCC_OSCILLATORTYPE_HSI
-                              |RCC_OSCILLATORTYPE_LSI2|RCC_OSCILLATORTYPE_HSE;
+                              |RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
