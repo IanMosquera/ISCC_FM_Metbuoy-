@@ -84,6 +84,15 @@ void GetSTS40TempC(void);
 #define ADC_BUF_LEN 								64
 #define Timer16_Max_Counter  				15
 
+// State Machine Definition
+#define	STATE_IDLE					00
+#define STATE_READDATA			01
+#define STATE_READLOAD			02
+#define STATE_LONGPRESSED		03
+
+#define STATE_LEDTOGGLE			00
+#define STATE_QUICKBLINK		01
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

@@ -101,7 +101,9 @@ uint8_t rtcDate[14]	=	 "24-02-01";
 uint8_t ReadDataTimer = 0;
 uint8_t ReadLoadCurrentTimer = 0;
 uint8_t LED_Ctr = 0;
+uint8_t LED_State = 0;
 uint8_t LongPress_Ctr = 0;
+uint8_t State = 0;
 uint16_t Prog_Ctr;
 
 RTC_TimeTypeDef sTime;
@@ -116,7 +118,8 @@ static void Custom_Rx_Update_Char(void);
 static void Custom_Rx_Send_Notification(void);
 
 /* USER CODE BEGIN PFP */
-void LED_STAT(void);
+void LED_STAT_TwoBlink(void);
+void LED_STAT_Toggle(void);
 bool LongPressed(void);
 void ReadChargingData(void);
 void ReadTempData(void);
@@ -129,10 +132,9 @@ void TaskReadData(void);
 void ReadRTCTime(void);
 void ReadRTCDate(void);
 void ReadRTCTask(void);
-
-
 bool TimeToReadData(void);
 bool TimeToReadLoadCurrent(void);
+void Toggle_Load(void);
 
 
 /* USER CODE END PFP */
@@ -240,6 +242,7 @@ void Custom_APP_Init(void)
 	UTIL_SEQ_RegTask(1 << CFG_TASK_READCFBTREG,		UTIL_SEQ_RFU, ReadConfigBitsRegister);
 	UTIL_SEQ_RegTask(1 << CFG_TASK_READ_RTC_DATA,	UTIL_SEQ_RFU, ReadRTCTask);
 	UTIL_SEQ_RegTask(1 << CFG_TASK_READSYSSTREG, 	UTIL_SEQ_RFU, ReadSystemStatusRegister);
+	UTIL_SEQ_RegTask(1 << CFG_TASK_TOGGLE_LOAD, 	UTIL_SEQ_RFU, Toggle_Load);
 	UTIL_SEQ_RegTask(1 << CFG_TASK_SEND_STR, 			UTIL_SEQ_RFU, SPP_Transmit);
 
 
@@ -353,36 +356,35 @@ void FilterCommands(uint8_t * pPayload, uint8_t Length)
 
 
 
-void LED_STAT(void)
+void LED_STAT_TwoBlink(void)
 {
-	if (QuickTwoBlink_Flag)
+	if (LED_Ctr >=4)
 	{
-		if (LED_Ctr >=4)
-		{
-			LED_Ctr = 0;
-			QuickTwoBlink_Flag = false;
-		}
-		else
-		{
-			if (LED_Ctr == 0) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_SET);
-			if (LED_Ctr == 1) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_RESET);
-			if (LED_Ctr == 2) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_SET);
-			if (LED_Ctr == 3) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_RESET);
-			LED_Ctr++;
-		}
+		LED_Ctr = 0;
+		LED_State = STATE_LEDTOGGLE;
 	}
 	else
 	{
-		// Toogle LED every Second
-		if (LED_Ctr >= 9)
-		{
-			HAL_GPIO_TogglePin(STAT_GPIO_Port, STAT_Pin);
-			LED_Ctr = 0;
-		}
-		else
-		{
-			LED_Ctr++;
-		}
+		if (LED_Ctr == 0) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_SET);
+		if (LED_Ctr == 1) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_RESET);
+		if (LED_Ctr == 2) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_SET);
+		if (LED_Ctr == 3) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_RESET);
+		LED_Ctr++;
+	}
+}
+
+
+void LED_STAT_Toggle(void)
+{
+	if (LED_Ctr >= 9)
+	{
+		HAL_GPIO_TogglePin(STAT_GPIO_Port, STAT_Pin);
+		LED_Ctr = 0;
+		State = STATE_IDLE;
+	}
+	else
+	{
+		LED_Ctr++;
 	}
 }
 
@@ -509,13 +511,31 @@ void ReadLoadCurrent(void)
 	LTC4162_ReadSystemStatusReg(&ltc);
 	//if (ltc.ssReg.vin_gt_vbat == 0) LTC4162_WriteConfigBitsReg(&ltc, force_telemetry_on | telemetry_speed);
 
-	if (ltc.ssReg.vin_gt_vbat){
+	if (ltc.ssReg.vin_gt_vbat)
+	{
 		if(ltc.ssReg.en_chg){
 			// suspend charger
 			SetConfigBitsReg(&ltc, suspend_charger);
-			HAL_Delay(500);
+			sprintf((char *)system_Message, "Reading Current Load:");
+			SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
+			HAL_Delay(1000);
 			LTC4162_ReadIIN(&ltc);
 			ltc.iOUT = ltc.iIN;
+
+			SetConfigBitsReg(&ltc, suspend_charger);
+			sprintf((char *)system_Message, "...\r\n");
+			SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
+			HAL_Delay(1000);
+			LTC4162_ReadIIN(&ltc);
+			ltc.iOUT = ltc.iIN;
+
+			/*			SetConfigBitsReg(&ltc, suspend_charger);
+			sprintf((char *)system_Message, "#\r\n");
+			SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
+			HAL_Delay(1000);
+			LTC4162_ReadIIN(&ltc);
+			ltc.iOUT = ltc.iIN;*/
+
 			sprintf((char *)system_Message, "LOAD_CUR: %6.3f\r\n", ltc.iOUT);
 			SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
 			// clear suspend charger
@@ -530,7 +550,9 @@ void ReadLoadCurrent(void)
 			SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
 			SetConfigBitsReg(&ltc, zero_cfg);
 		}
-	}else{
+	}
+	else
+	{
 		SetConfigBitsReg(&ltc, force_telemetry_on | telemetry_speed);
 		LTC4162_ReadIBAT(&ltc);
 		ltc.iOUT = -ltc.iBAT;
@@ -652,9 +674,9 @@ void TaskReadData(void)
 {
 	//UTIL_SEQ_SetTask(1 << CFG_TASK_READ_RTC_DATA, CFG_SCH_PRIO_0);
 	UTIL_SEQ_SetTask(1 << CFG_TASK_READCHGDATA, CFG_SCH_PRIO_0);
-	UTIL_SEQ_SetTask(1 << CFG_TASK_READCFBTREG, CFG_SCH_PRIO_0);
+	//UTIL_SEQ_SetTask(1 << CFG_TASK_READCFBTREG, CFG_SCH_PRIO_0);
 	UTIL_SEQ_SetTask(1 << CFG_TASK_READSYSSTREG, CFG_SCH_PRIO_0);
-	UTIL_SEQ_SetTask(1 << CFG_TASK_READTEMPDATA, CFG_SCH_PRIO_0);
+	//UTIL_SEQ_SetTask(1 << CFG_TASK_READTEMPDATA, CFG_SCH_PRIO_0);
 }
 
 
@@ -662,7 +684,7 @@ void TaskReadData(void)
 
 bool TimeToReadData(void)
 {
-	if (ReadDataTimer >= 49)
+	if (ReadDataTimer >= 99)
 	{
 		ReadDataTimer = 0;
 		return true;
@@ -694,6 +716,25 @@ bool TimeToReadLoadCurrent(void)
 
 
 
+void Toggle_Load(void)
+{
+	if (HAL_GPIO_ReadPin(SW_OFF_GPIO_Port, SW_OFF_Pin) == GPIO_PIN_RESET)
+	{
+		HAL_GPIO_TogglePin(DS_EFUSE_GPIO_Port, DS_EFUSE_Pin);
+
+		sprintf(a_SzString, "+LOAD toggled!\r\n");
+		SPP_Transmit();
+
+		LED_Ctr = 0;
+		LED_State = STATE_QUICKBLINK;
+	}
+	SW_Pressed_Flag = false;
+}
+
+
+
+
+
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
   if (GPIO_Pin == SW_OFF_Pin)
@@ -702,6 +743,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
   	sprintf(a_SzString, "SW_OFF button pressed\r\n");
 		UTIL_SEQ_SetTask(1 << CFG_TASK_SEND_STR, CFG_SCH_PRIO_0);
+
+		LongPress_Ctr = 0;
+		//State = STATE_LONGPRESSED;
   }
 }
 
@@ -714,11 +758,68 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if (htim == &htim2)
 	{
+		switch (LED_State)
+		{
+			case STATE_LEDTOGGLE:
+				LED_STAT_Toggle();
+				break;
+			case STATE_QUICKBLINK:
+				LED_STAT_TwoBlink();
+				break;
+			default:
+				break;
+		}
+
+		switch(State)
+		{
+			case STATE_IDLE:
+				if (SW_Pressed_Flag)
+				{
+					if (LongPressed())
+					{
+						UTIL_SEQ_SetTask(1 << CFG_TASK_TOGGLE_LOAD, CFG_SCH_PRIO_0);
+						LED_Ctr = 0;
+					}
+				}
+
+				if (TimeToReadData())
+				{
+					State = STATE_READDATA;
+					break;
+				}
+
+				break;
+
+			case STATE_READDATA:
+				TaskReadData();
+				State = STATE_READLOAD;
+				break;
+
+			case STATE_READLOAD:
+				UTIL_SEQ_SetTask(1 << CFG_TASK_READ_IOUT, CFG_SCH_PRIO_0);
+				LED_Ctr = 0;
+				State = STATE_IDLE;
+				break;
+
+			case STATE_LONGPRESSED:
+//				if (LongPressed())
+//				{
+//					UTIL_SEQ_SetTask(1 << CFG_TASK_TOGGLE_LOAD, CFG_SCH_PRIO_0);
+//					LED_Ctr = 0;
+//					break;
+//				}
+				break;
+
+			default:
+				break;
+		}
+
+
+/*
 
 		if (TimeToReadData())
 		{
 			TaskReadData();
-			//HAL_GPIO_TogglePin(STAT_GPIO_Port, STAT_Pin);
 		}
 
 		if (TimeToReadLoadCurrent())
@@ -742,7 +843,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 			}
 		}
 
-		LED_STAT();
+		LED_STAT();*/
 	}
 }
 /* USER CODE END FD_LOCAL_FUNCTIONS*/
