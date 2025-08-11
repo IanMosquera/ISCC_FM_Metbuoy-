@@ -80,6 +80,9 @@ extern I2C_HandleTypeDef hi2c1;
 extern TIM_HandleTypeDef htim2;
 
 extern LTC4162 ltc;
+extern dateTime_t DT;
+
+extern bool MidnightResetEfuse_Flag;
 extern float gIMON;
 extern uint8_t	STS40_RXBuffer[3];     // RX buffer for I2C
 extern uint8_t	sts40_TXCODE; 	// measure T with highest precision
@@ -93,16 +96,17 @@ bool SW_Pressed_Flag = false;
 
 char system_Message[128];
 
-uint8_t txbuff[70];
 uint8_t aShowTime[16] = "hh:ms:ss";
 uint8_t aShowDateTime[20] = "YY/MM/DD,hh:ms:ss";
 uint8_t rtcTime[12]	=	 "12:03:00";
 uint8_t rtcDate[14]	=	 "24-02-01";
 uint8_t ReadDataTimer = 0;
 uint8_t ReadLoadCurrentTimer = 0;
+uint8_t Delay_Reset_Ctr = 0;
 uint8_t LED_Ctr = 0;
 uint8_t LED_State = 0;
 uint8_t LongPress_Ctr = 0;
+uint8_t ToSecond_Ctr = 0;
 uint8_t State = 0;
 uint16_t Prog_Ctr;
 
@@ -245,11 +249,9 @@ void Custom_APP_Init(void)
 	UTIL_SEQ_RegTask(1 << CFG_TASK_TOGGLE_LOAD, 	UTIL_SEQ_RFU, Toggle_Load);
 	UTIL_SEQ_RegTask(1 << CFG_TASK_SEND_STR, 			UTIL_SEQ_RFU, SPP_Transmit);
 
-
-	sprintf(a_SzString, "BLE Transmit Test\r\n");
-
-	// Start Timer for Reading Charging Data
+	MidnightResetEfuse_Flag = false;
 	Prog_Ctr = 0;
+
 	HAL_TIM_Base_Start_IT(&htim2);
 
   /* USER CODE END CUSTOM_APP_Init */
@@ -292,6 +294,7 @@ void FilterCommands(uint8_t * pPayload, uint8_t Length)
 		else{
 		}
 	}
+
 	// For RTC
 	else if((pPayload[0]=='R') & (pPayload[1]=='T') & (pPayload[2]=='C')){
 		if ((pPayload[3]=='R') & (pPayload[4]=='T')){
@@ -352,6 +355,31 @@ void FilterCommands(uint8_t * pPayload, uint8_t Length)
 			RTC_WriteDateTime(&sTime, &sDate);
 		}
 	}
+
+	// For iscc Date and Time
+	else if((pPayload[0]=='D') & (pPayload[1]=='T'))
+	{
+		if ((pPayload[3]=='R') & (pPayload[4]=='D') & (pPayload[5]=='T'))
+		{
+		sprintf((char *)str,"%02d/%02d/%02d,%02d:%02d:%02d\r\n", DT.Year, DT.Month, DT.Days, DT.Hour, DT.Min, DT.Sec);
+		SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&str[0]);
+		}
+		else if((pPayload[3]=='W') & (pPayload[4]=='D') & (pPayload[5]=='T'))
+		{
+			DT.Year = ((pPayload[7]  - 48) * 10) + (pPayload[8]  - 48);
+			DT.Month = ((pPayload[10] - 48) * 10) + (pPayload[11] - 48);
+			DT.Days = ((pPayload[13] - 48) * 10) + (pPayload[14] - 48);
+			DT.Hour = ((pPayload[16] - 48) * 10) + (pPayload[17]  - 48);
+			DT.Min = ((pPayload[19] - 48) * 10) + (pPayload[20] - 48);
+			DT.Sec = ((pPayload[22] - 48) * 10) + (pPayload[23] - 48);
+		}
+	}
+
+
+	// For EFUSE
+	else if((pPayload[0]=='E') & (pPayload[1]=='N') & (pPayload[2]=='E') & (pPayload[3]=='F')) EnableLoad();
+	else if((pPayload[0]=='D') & (pPayload[1]=='S') & (pPayload[2]=='E') & (pPayload[3]=='F')) DisableLoad();
+
 }
 
 
@@ -376,7 +404,7 @@ void LED_STAT_TwoBlink(void)
 
 void LED_STAT_Toggle(void)
 {
-	if (LED_Ctr >= 9)
+	if (LED_Ctr >= 9) // One second
 	{
 		HAL_GPIO_TogglePin(STAT_GPIO_Port, STAT_Pin);
 		LED_Ctr = 0;
@@ -758,6 +786,36 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if (htim == &htim2)
 	{
+		// DATE TIME COUNTER
+		if (ToSecond_Ctr >= 9) // One second
+		{
+			CountTimeSeconds();
+			ToSecond_Ctr = 0;
+		}
+		else	ToSecond_Ctr++;
+
+		// Midnight Reset of Efuse (+Load)
+		switch(MidnightResetEfuse_Flag)
+		{
+			case false:
+				break;
+			case true:
+				DisableLoad();
+
+				if (Delay_Reset_Ctr >=0)
+				{
+					EnableLoad();
+					Delay_Reset_Ctr = 0;
+					MidnightResetEfuse_Flag = false;
+				}
+				else Delay_Reset_Ctr++;
+
+				break;
+			default:
+				break;
+		}
+
+		// LED STATE MACHINE
 		switch (LED_State)
 		{
 			case STATE_LEDTOGGLE:
@@ -770,6 +828,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 				break;
 		}
 
+		// PROGRAM STATE MACHINE
 		switch(State)
 		{
 			case STATE_IDLE:
@@ -801,49 +860,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 				State = STATE_IDLE;
 				break;
 
-			case STATE_LONGPRESSED:
-//				if (LongPressed())
-//				{
-//					UTIL_SEQ_SetTask(1 << CFG_TASK_TOGGLE_LOAD, CFG_SCH_PRIO_0);
-//					LED_Ctr = 0;
-//					break;
-//				}
-				break;
-
 			default:
 				break;
 		}
 
-
-/*
-
-		if (TimeToReadData())
-		{
-			TaskReadData();
-		}
-
-		if (TimeToReadLoadCurrent())
-		{
-			UTIL_SEQ_SetTask(1 << CFG_TASK_READ_IOUT, CFG_SCH_PRIO_0);
-		}
-
-
-
-		if (SW_Pressed_Flag)
-		{
-			if (LongPressed())
-			{
-				if (HAL_GPIO_ReadPin(SW_OFF_GPIO_Port, SW_OFF_Pin) == GPIO_PIN_RESET)
-				{
-					HAL_GPIO_TogglePin(DS_EFUSE_GPIO_Port, DS_EFUSE_Pin);
-					QuickTwoBlink_Flag = true;
-					LED_Ctr = 0;
-				}
-				SW_Pressed_Flag = false;
-			}
-		}
-
-		LED_STAT();*/
 	}
 }
 /* USER CODE END FD_LOCAL_FUNCTIONS*/

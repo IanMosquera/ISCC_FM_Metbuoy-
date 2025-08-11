@@ -30,6 +30,7 @@
 /* USER CODE BEGIN Includes */
 
 // Initital Push
+#include "interruptTimer.h"
 #include "math.h"
 #include "strings.h"
 #include "stdio.h"
@@ -74,20 +75,9 @@ UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 LTC4162 ltc;
+dateTime_t DT;
 
-//static char str[133], strDisplay[133];
-
-/* START - ADC variables */
-extern uint16_t	buf_avg[2];
-uint16_t adc_buff[32];
-uint16_t adc_buff_average[2];
-float gIMON;
-
-uint16_t 	ACU_Current_Consumption;
-uint32_t 	adcval;
-double 		AVE_Current_Consumption;
-double 		MAX9938Vout;
-/* END - ADC variables */
+bool MidnightResetEfuse_Flag;
 
 uint8_t	STS40_RXBuffer[3];    // RX buffer for I2C
 uint8_t	sts40_TXCODE; 				// measure T with highest precision
@@ -736,14 +726,24 @@ static void MX_GPIO_Init(void)
 //		adc_tmr_ctr = 0;
 //}
 
+
+void EnableLoad(void)
+{
+	// Low = On Load
+	// High =  Off Load
+	HAL_GPIO_WritePin(DS_EFUSE_GPIO_Port, DS_EFUSE_Pin, GPIO_PIN_RESET);
+}
+
+void DisableLoad(void)
+{
+	// Low = On Load
+	// High =  Off Load
+	HAL_GPIO_WritePin(DS_EFUSE_GPIO_Port, DS_EFUSE_Pin, GPIO_PIN_SET);
+}
+
 static void ISCC_GPIO_Init(void)
 {
-	HAL_GPIO_WritePin(DS_EFUSE_GPIO_Port, DS_EFUSE_Pin, GPIO_PIN_RESET);
-	//HAL_GPIO_WritePin(CE5V_GPIO_Port, CE5V_Pin, GPIO_PIN_RESET);			/**< Enable 5V output of TS300 5V Converter */
-
-//	HAL_GPIO_WritePin(SW1_GPIO_Port, SW1_Pin, GPIO_PIN_RESET); 			/**< TurnOff Load by default*/
-//	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
-
+	EnableLoad();
 }
 
 
@@ -813,6 +813,55 @@ static void ISCC_GPIO_Init(void)
 //		adc_buff_average[i] = 0x0000 + 1;
 //	}
 //}
+
+void CountTimeSeconds(void)
+{
+	if (++DT.Sec > 59)
+	{
+		DT.Sec = 0;
+		//arQ.Flg.TEST_FLAG = true;
+
+		if (++DT.Min > 59)
+		{
+			DT.Min = 0;
+			if (++DT.Hour > 23)
+			{
+				DT.Hour = 0;
+				++DT.Days;
+
+				if((DT.Days == 29 && DT.Month == 2 && !IS_LEAP(DT.Year)) ||
+					 (DT.Days == 30 && DT.Month == 2)                      ||
+					 (DT.Days == 31 &&
+							 (DT.Month == 4 ||
+								DT.Month == 6 ||
+								DT.Month == 9 ||
+								DT.Month == 11))||
+					 (DT.Days == 32))
+				{
+					DT.Month++;
+					DT.Days = 1;
+				}
+				if (DT.Month == 13)
+				{
+					DT.Year++;
+					DT.Month = 1;
+				}
+				MidnightResetEfuse_Flag = true;
+			}
+		}
+	}
+
+	// Sync Time Every Hour
+	if ((DT.Hour_Old != DT.Hour) &&
+			(DT.Min == 58))
+	{
+		//arQ.Flg.SYNC_FLAG = true;
+		DT.Hour_Old = DT.Hour;
+	}
+}
+
+
+
 
 void GetSTS40TempC(void){
 	uint16_t rawTemp;

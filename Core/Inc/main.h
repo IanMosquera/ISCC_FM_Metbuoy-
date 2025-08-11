@@ -36,7 +36,7 @@ extern "C" {
 /* USER CODE BEGIN Includes */
 
 #include "string.h"
-
+#include "stdbool.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -61,7 +61,10 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 void GetSTS40TempC(void);
+void CountTimeSeconds(void);
 
+void EnableLoad(void);
+void DisableLoad(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
@@ -88,7 +91,6 @@ void GetSTS40TempC(void);
 #define	STATE_IDLE					00
 #define STATE_READDATA			01
 #define STATE_READLOAD			02
-#define STATE_LONGPRESSED		03
 
 #define STATE_LEDTOGGLE			00
 #define STATE_QUICKBLINK		01
