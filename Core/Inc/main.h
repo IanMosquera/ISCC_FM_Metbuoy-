@@ -65,11 +65,14 @@ void CountTimeSeconds(void);
 
 void EnableLoad(void);
 void DisableLoad(void);
+
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
 #define STAT_Pin GPIO_PIN_0
 #define STAT_GPIO_Port GPIOA
+#define nEF_FLT_Pin GPIO_PIN_2
+#define nEF_FLT_GPIO_Port GPIOA
 #define GIMON_Pin GPIO_PIN_3
 #define GIMON_GPIO_Port GPIOA
 #define CE5V_Pin GPIO_PIN_4

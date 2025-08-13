@@ -77,7 +77,7 @@ UART_HandleTypeDef huart1;
 LTC4162 ltc;
 dateTime_t DT;
 
-bool MidnightResetEfuse_Flag;
+uint8_t MidnightEfuseReset_Flag;
 
 uint8_t	STS40_RXBuffer[3];    // RX buffer for I2C
 uint8_t	sts40_TXCODE; 				// measure T with highest precision
@@ -158,19 +158,13 @@ int main(void)
   sts40_TXCODE =  0xFD;
 
   HAL_Delay(3000);
+  xprintf(PC, "ASTI iSCC FW: 1.0.1\r\n");
 
-  xprintf(PC, "\r\n\r\nInitiate RTC");
+  xprintf(PC, "Initiate RTC\r\n");
+  xprintf(PC, "Initiate LTC Device\r\n");
+
   RTC_Init();
-
-  xprintf(PC, "\r\n\r\nASTI iSCC FW: 1.0.1");
-
-  xprintf(PC, "\r\n\r\nInitiate LTC Device");
-
   LTC_Init(&ltc);
-
-  //ADC_Init();
-  //HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buff, 32);
-
   ISCC_GPIO_Init();
 
   /* USER CODE END 2 */
@@ -674,6 +668,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : nEF_FLT_Pin */
+  GPIO_InitStruct.Pin = nEF_FLT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(nEF_FLT_GPIO_Port, &GPIO_InitStruct);
+
   /*Configure GPIO pin : DS_EFUSE_Pin */
   GPIO_InitStruct.Pin = DS_EFUSE_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -732,6 +732,7 @@ void EnableLoad(void)
 	// Low = On Load
 	// High =  Off Load
 	HAL_GPIO_WritePin(DS_EFUSE_GPIO_Port, DS_EFUSE_Pin, GPIO_PIN_RESET);
+	xprintf(PC, "Load Enabled\r\n");
 }
 
 void DisableLoad(void)
@@ -739,6 +740,7 @@ void DisableLoad(void)
 	// Low = On Load
 	// High =  Off Load
 	HAL_GPIO_WritePin(DS_EFUSE_GPIO_Port, DS_EFUSE_Pin, GPIO_PIN_SET);
+	xprintf(PC, "Load disabled\r\n");
 }
 
 static void ISCC_GPIO_Init(void)
@@ -846,7 +848,7 @@ void CountTimeSeconds(void)
 					DT.Year++;
 					DT.Month = 1;
 				}
-				MidnightResetEfuse_Flag = true;
+				MidnightEfuseReset_Flag = true;
 			}
 		}
 	}
@@ -883,6 +885,9 @@ void GetSTS40TempC(void){
 	rawTemp = (STS40_RXBuffer[0] << 8) | STS40_RXBuffer[1];
 	Temp_C = ((rawTemp/65535.0f) * 175.0f) - 45.0f;
 }
+
+
+
 
 
 /* USER CODE END 4 */

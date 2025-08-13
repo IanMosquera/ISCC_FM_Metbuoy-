@@ -32,6 +32,7 @@
 #include "usbd_cdc_if.h"
 #include "LTC4162.h"
 #include "ASTI_RTC.h"
+#include "arQ.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -82,7 +83,7 @@ extern TIM_HandleTypeDef htim2;
 extern LTC4162 ltc;
 extern dateTime_t DT;
 
-extern bool MidnightResetEfuse_Flag;
+extern uint8_t MidnightEfuseReset_Flag;
 extern float gIMON;
 extern uint8_t	STS40_RXBuffer[3];     // RX buffer for I2C
 extern uint8_t	sts40_TXCODE; 	// measure T with highest precision
@@ -108,7 +109,6 @@ uint8_t LED_State = 0;
 uint8_t LongPress_Ctr = 0;
 uint8_t ToSecond_Ctr = 0;
 uint8_t State = 0;
-uint16_t Prog_Ctr;
 
 RTC_TimeTypeDef sTime;
 RTC_DateTypeDef sDate;
@@ -122,21 +122,26 @@ static void Custom_Rx_Update_Char(void);
 static void Custom_Rx_Send_Notification(void);
 
 /* USER CODE BEGIN PFP */
+void EnableLoadTest(void);
 void LED_STAT_TwoBlink(void);
 void LED_STAT_Toggle(void);
-bool LongPressed(void);
+void LEDStateMachineTest(void);
+bool ThreeSecondsLongPressed(void);
+void MidnightEfuseResetTest(void);
+void ProgrameStateMachineTest(void);
 void ReadChargingData(void);
+void ReadEFuse(void);
 void ReadTempData(void);
 void ReadConfigBitsRegister(void);
 void ReadSystemStatusRegister(void);
-void ReadGIMON(void);
 void ReadLoadCurrent(void);
 void FilterCommands(uint8_t * pPayload, uint8_t Length);
-void TaskReadData(void);
 void ReadRTCTime(void);
 void ReadRTCDate(void);
 void ReadRTCTask(void);
+void SecondsCounterTest(void);
 bool TimeToReadData(void);
+void TimeToReadDataTest(void);
 bool TimeToReadLoadCurrent(void);
 void Toggle_Load(void);
 
@@ -241,6 +246,7 @@ void Custom_APP_Init(void)
   /* USER CODE BEGIN CUSTOM_APP_Init */
 
 	UTIL_SEQ_RegTask(1 << CFG_TASK_READCHGDATA,  	UTIL_SEQ_RFU, ReadChargingData);
+	UTIL_SEQ_RegTask(1 << CFG_TASK_READEFUSE,  		UTIL_SEQ_RFU, ReadEFuse);
 	UTIL_SEQ_RegTask(1 << CFG_TASK_READ_IOUT,  		UTIL_SEQ_RFU, ReadLoadCurrent);
 	UTIL_SEQ_RegTask(1 << CFG_TASK_READTEMPDATA,	UTIL_SEQ_RFU, ReadTempData);
 	UTIL_SEQ_RegTask(1 << CFG_TASK_READCFBTREG,		UTIL_SEQ_RFU, ReadConfigBitsRegister);
@@ -249,8 +255,7 @@ void Custom_APP_Init(void)
 	UTIL_SEQ_RegTask(1 << CFG_TASK_TOGGLE_LOAD, 	UTIL_SEQ_RFU, Toggle_Load);
 	UTIL_SEQ_RegTask(1 << CFG_TASK_SEND_STR, 			UTIL_SEQ_RFU, SPP_Transmit);
 
-	MidnightResetEfuse_Flag = false;
-	Prog_Ctr = 0;
+	MidnightEfuseReset_Flag = false;
 
 	HAL_TIM_Base_Start_IT(&htim2);
 
@@ -383,15 +388,23 @@ void FilterCommands(uint8_t * pPayload, uint8_t Length)
 }
 
 
+void EnableLoadTest(void)
+{
+	if (SW_Pressed_Flag)
+	{
+		if (ThreeSecondsLongPressed())
+		{
+			UTIL_SEQ_SetTask(1 << CFG_TASK_TOGGLE_LOAD, CFG_SCH_PRIO_0);
+			LED_Ctr = 0;
+		}
+	}
+}
+
+
 
 void LED_STAT_TwoBlink(void)
 {
-	if (LED_Ctr >=4)
-	{
-		LED_Ctr = 0;
-		LED_State = STATE_LEDTOGGLE;
-	}
-	else
+	if (LED_Ctr < 4)
 	{
 		if (LED_Ctr == 0) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_SET);
 		if (LED_Ctr == 1) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_RESET);
@@ -399,42 +412,93 @@ void LED_STAT_TwoBlink(void)
 		if (LED_Ctr == 3) HAL_GPIO_WritePin(STAT_GPIO_Port, STAT_Pin, GPIO_PIN_RESET);
 		LED_Ctr++;
 	}
+	else
+	{
+		LED_Ctr = 0;
+		LED_State = STATE_LEDTOGGLE;
+	}
 }
 
 
 void LED_STAT_Toggle(void)
 {
-	if (LED_Ctr >= 9) // One second
+	if (LED_Ctr < 10)
+		LED_Ctr++;
+	else
 	{
 		HAL_GPIO_TogglePin(STAT_GPIO_Port, STAT_Pin);
 		LED_Ctr = 0;
 		State = STATE_IDLE;
 	}
-	else
-	{
-		LED_Ctr++;
-	}
 }
 
 
-
-
-bool LongPressed(void)
+void LEDStateMachineTest(void)
 {
-	if (LongPress_Ctr >=29)
+	switch (LED_State)
 	{
-		LongPress_Ctr = 0;
-		return true;
-	}
-	else
-	{
-		LongPress_Ctr++;
-		return false;
+		case STATE_LEDTOGGLE:
+			LED_STAT_Toggle();
+			break;
+		case STATE_QUICKBLINK:
+			LED_STAT_TwoBlink();
+			break;
+		default:
+			break;
 	}
 }
 
 
 
+
+
+void MidnightEfuseResetTest(void)
+{
+	if (MidnightEfuseReset_Flag)
+	{
+		if (Delay_Reset_Ctr == 0) DisableLoad();
+
+		if (Delay_Reset_Ctr < 10)
+		{
+			Delay_Reset_Ctr++;
+		}
+		else
+		{
+			EnableLoad();
+			Delay_Reset_Ctr = 0;
+			MidnightEfuseReset_Flag = false;
+		}
+	}
+}
+
+
+
+void ProgrameStateMachineTest(void)
+{
+	switch(State)
+	{
+		case STATE_IDLE:
+			EnableLoadTest();
+			TimeToReadDataTest();
+			break;
+
+		case STATE_READDATA:
+			UTIL_SEQ_SetTask(1 << CFG_TASK_READCHGDATA, CFG_SCH_PRIO_0);
+			UTIL_SEQ_SetTask(1 << CFG_TASK_READSYSSTREG, CFG_SCH_PRIO_0);
+			State = STATE_READLOAD;
+			break;
+
+		case STATE_READLOAD:
+			UTIL_SEQ_SetTask(1 << CFG_TASK_READ_IOUT, CFG_SCH_PRIO_0);
+			UTIL_SEQ_SetTask(1 << CFG_TASK_READEFUSE, CFG_SCH_PRIO_0);
+			LED_Ctr = 0;
+			State = STATE_IDLE;
+			break;
+
+		default:
+			break;
+	}
+}
 
 void ReadChargingData(void)
 {
@@ -466,6 +530,21 @@ void ReadChargingData(void)
 
 
 
+
+void ReadEFuse(void)
+{
+	if (HAL_GPIO_ReadPin(nEF_FLT_GPIO_Port, nEF_FLT_Pin) == GPIO_PIN_RESET)
+	{
+		xprintf(PC, "Efuse: Fault!\r\n");
+		DisableLoad();
+		HAL_Delay(1000);
+		EnableLoad();
+	}
+	else
+	{
+		xprintf(PC, "Efuse: OK!\r\n");
+	}
+}
 
 
 
@@ -546,12 +625,14 @@ void ReadLoadCurrent(void)
 			SetConfigBitsReg(&ltc, suspend_charger);
 			sprintf((char *)system_Message, "Reading Current Load:");
 			SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
+			xprintf(PC, "%s", system_Message);
 			HAL_Delay(1000);
 			LTC4162_ReadIIN(&ltc);
 			ltc.iOUT = ltc.iIN;
 
 			SetConfigBitsReg(&ltc, suspend_charger);
 			sprintf((char *)system_Message, "...\r\n");
+			xprintf(PC, "%s", system_Message);
 			SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
 			HAL_Delay(1000);
 			LTC4162_ReadIIN(&ltc);
@@ -566,6 +647,7 @@ void ReadLoadCurrent(void)
 
 			sprintf((char *)system_Message, "LOAD_CUR: %6.3f\r\n", ltc.iOUT);
 			SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
+			xprintf(PC, "%s", system_Message);
 			// clear suspend charger
 			SetConfigBitsReg(&ltc, zero_cfg);
 		}
@@ -576,6 +658,7 @@ void ReadLoadCurrent(void)
 			ltc.iOUT = ltc.iIN;
 			sprintf((char *)system_Message, "LOAD_CUR: %6.3f\r\n", ltc.iOUT);
 			SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
+			xprintf(PC, "%s", system_Message);
 			SetConfigBitsReg(&ltc, zero_cfg);
 		}
 	}
@@ -586,15 +669,10 @@ void ReadLoadCurrent(void)
 		ltc.iOUT = -ltc.iBAT;
 		sprintf((char *)system_Message, "LOAD_CUR: %6.3f\r\n", ltc.iOUT);
 		SPP_Update_Char(CUSTOM_STM_RX, (uint8_t *)&system_Message[0]);
+		xprintf(PC, "%s", system_Message);
 		SetConfigBitsReg(&ltc, zero_cfg);
 	}
 }
-
-
-
-
-
-
 
 
 
@@ -628,12 +706,24 @@ void ReadRTCTask(void)
 
 
 
-void ReadGIMON(void){
-//	uint16_t temp;
-//
-//	temp = (adc_buff_average[0] + adc_buff_average[1]);
-//	gIMON = (temp * ( 1.765f/4096.0f)) *5.0125;
+void SecondsCounterTest(void)
+{
+	// Timer ticks every tenth of a second
+	// Calls CountTimeSeconds() every 10/10 of tenth of a second
+	if (ToSecond_Ctr < 10)
+	{
+		ToSecond_Ctr++;
+	}
+	else
+	{
+		CountTimeSeconds();
+		ToSecond_Ctr = 0;
+	}
 }
+
+
+
+
 
 
 /* USER CODE END FD */
@@ -698,14 +788,21 @@ void SPP_Transmit(void){
 
 
 
-void TaskReadData(void)
+
+bool ThreeSecondsLongPressed(void)
 {
-	//UTIL_SEQ_SetTask(1 << CFG_TASK_READ_RTC_DATA, CFG_SCH_PRIO_0);
-	UTIL_SEQ_SetTask(1 << CFG_TASK_READCHGDATA, CFG_SCH_PRIO_0);
-	//UTIL_SEQ_SetTask(1 << CFG_TASK_READCFBTREG, CFG_SCH_PRIO_0);
-	UTIL_SEQ_SetTask(1 << CFG_TASK_READSYSSTREG, CFG_SCH_PRIO_0);
-	//UTIL_SEQ_SetTask(1 << CFG_TASK_READTEMPDATA, CFG_SCH_PRIO_0);
+	if (LongPress_Ctr < 30)
+	{
+		LongPress_Ctr++;
+		return false;
+	}
+	else
+	{
+		LongPress_Ctr = 0;
+		return true;
+	}
 }
+
 
 
 
@@ -724,6 +821,14 @@ bool TimeToReadData(void)
 	}
 }
 
+
+
+
+void TimeToReadDataTest(void)
+{
+	if (TimeToReadData())
+		State = STATE_READDATA;
+}
 
 
 bool TimeToReadLoadCurrent(void)
@@ -752,6 +857,7 @@ void Toggle_Load(void)
 
 		sprintf(a_SzString, "+LOAD toggled!\r\n");
 		SPP_Transmit();
+		xprintf(PC, a_SzString);
 
 		LED_Ctr = 0;
 		LED_State = STATE_QUICKBLINK;
@@ -786,84 +892,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if (htim == &htim2)
 	{
-		// DATE TIME COUNTER
-		if (ToSecond_Ctr >= 9) // One second
-		{
-			CountTimeSeconds();
-			ToSecond_Ctr = 0;
-		}
-		else	ToSecond_Ctr++;
-
-		// Midnight Reset of Efuse (+Load)
-		switch(MidnightResetEfuse_Flag)
-		{
-			case false:
-				break;
-			case true:
-				DisableLoad();
-
-				if (Delay_Reset_Ctr >=0)
-				{
-					EnableLoad();
-					Delay_Reset_Ctr = 0;
-					MidnightResetEfuse_Flag = false;
-				}
-				else Delay_Reset_Ctr++;
-
-				break;
-			default:
-				break;
-		}
-
-		// LED STATE MACHINE
-		switch (LED_State)
-		{
-			case STATE_LEDTOGGLE:
-				LED_STAT_Toggle();
-				break;
-			case STATE_QUICKBLINK:
-				LED_STAT_TwoBlink();
-				break;
-			default:
-				break;
-		}
-
-		// PROGRAM STATE MACHINE
-		switch(State)
-		{
-			case STATE_IDLE:
-				if (SW_Pressed_Flag)
-				{
-					if (LongPressed())
-					{
-						UTIL_SEQ_SetTask(1 << CFG_TASK_TOGGLE_LOAD, CFG_SCH_PRIO_0);
-						LED_Ctr = 0;
-					}
-				}
-
-				if (TimeToReadData())
-				{
-					State = STATE_READDATA;
-					break;
-				}
-
-				break;
-
-			case STATE_READDATA:
-				TaskReadData();
-				State = STATE_READLOAD;
-				break;
-
-			case STATE_READLOAD:
-				UTIL_SEQ_SetTask(1 << CFG_TASK_READ_IOUT, CFG_SCH_PRIO_0);
-				LED_Ctr = 0;
-				State = STATE_IDLE;
-				break;
-
-			default:
-				break;
-		}
-
+		SecondsCounterTest();
+		MidnightEfuseResetTest();
+		LEDStateMachineTest();
+		ProgrameStateMachineTest();
 	}
 }
 /* USER CODE END FD_LOCAL_FUNCTIONS*/
